@@ -1,0 +1,27 @@
+{
+    "name":"arc-1337",
+    "methods":[
+        {
+            "name":"set_policy",
+            "desc":"Sets the royalty policy for a given app id",
+            "args":[
+                {"name":"royalty_asset", "type":"asset"}, 
+                {"name":"policy", "type":"(address,uint64)[]"},
+                {"name":"acceptable_assets", "type":"uint64[]"}
+            ],
+            "returns":{"type":"void"}
+        },
+        {
+            "name":"transfer",
+            "desc":"Transfers an Asset from one account to another and enforces royalty payments",
+            "args":[
+                {"name":"royalty_asset", "type":"asset"}, 
+                {"name":"from", "type":"address"},
+                {"name":"to", "type":"address"},
+                {"name":"payment", "type":"txn"},
+                {"name":"extra_app_calls", "type":"appl"}
+            ],
+            "returns":{"type":"void"}
+        }
+    ]
+}

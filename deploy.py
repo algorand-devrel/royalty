@@ -1,4 +1,3 @@
-
 import base64
 from algosdk import algod
 from algosdk.future.transaction import *
