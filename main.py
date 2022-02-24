@@ -18,7 +18,6 @@ def get_method(i: Interface, name: str) -> Method:
     raise Exception("No method with the name {}".format(name))
 
 
-
 def main():
     # Get accounts
     accts = get_accounts()
@@ -32,7 +31,9 @@ def main():
     # Create NFT
     sp = client.suggested_params()
     pay_txn = PaymentTxn(addr, sp, app_addr, int(1e8))
-    app_txn = ApplicationCallTxn(addr, sp, app_id, OnComplete.NoOpOC, app_args=["create"])
+    app_txn = ApplicationCallTxn(
+        addr, sp, app_id, OnComplete.NoOpOC, app_args=["create"]
+    )
 
     signed = [txn.sign(pk) for txn in assign_group_id([pay_txn, app_txn])]
     txids = [tx.get_txid() for tx in signed]
@@ -40,27 +41,29 @@ def main():
     client.send_transactions(signed)
     results = [wait_for_confirmation(client, txid, 4) for txid in txids]
 
-    created_nft_id = results[1]['inner-txns'][0]['asset-index']
+    created_nft_id = results[1]["inner-txns"][0]["asset-index"]
 
     print("Created nft {}".format(created_nft_id))
 
     # Read in ABI description
     with open("royalty.json") as f:
-        js = f.read()
-
-    iface = Interface.from_json(js)
-
-    signer = AccountTransactionSigner(pk)
+        iface = Interface.from_json(f.read())
 
     policy = [
         ("H3ZG43FTOAIYKCL263DSF3V2ZQCFHXGIAWKIGFCNGL2WBBG67YE6FK3MTI", 10),
-        ("PJZ7WTR5XLK6XGSWA7TPFKNS4RA2NASZT6SPCUNBXUZCFSXBV2XVOOAMBE", 10)
+        ("PJZ7WTR5XLK6XGSWA7TPFKNS4RA2NASZT6SPCUNBXUZCFSXBV2XVOOAMBE", 10),
     ]
 
-    assets = []
-
     atc = AtomicTransactionComposer()
-    atc.add_method_call(app_id, get_method(iface, "set_policy"), addr, sp, signer, method_args=[created_nft_id, policy, assets])
+    signer = AccountTransactionSigner(pk)
+    atc.add_method_call(
+        app_id,
+        get_method(iface, "set_policy"),
+        addr,
+        sp,
+        signer,
+        method_args=[created_nft_id, policy, []],
+    )
     result = atc.execute(client, 2)
     print(result)
 

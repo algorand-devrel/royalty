@@ -19,8 +19,9 @@ def create_nft():
             }
         ),
         InnerTxnBuilder.Submit(),
-        Int(1)
+        Int(1),
     )
+
 
 addr = abi.Byte()
 share = abi.Uint64()
@@ -28,9 +29,14 @@ participant = abi.Tuple(addr, share)
 
 policy = abi.DynamicArray(participant)
 
+set_policy_selector = MethodSignature(
+    "set_policy(asset,(address,uint64)[],uint64[])void"
+)
+
+
 @Subroutine(TealType.uint64)
 def set_policy():
-    _participant = participant.new_instance() 
+    _participant = participant.new_instance()
     _share = share.new_instance()
     _addr = addr.new_instance()
 
@@ -40,7 +46,7 @@ def set_policy():
         _participant[0].store_into(_addr),
         _participant[1].store_into(_share),
         App.globalPut(Itob(_addr.get()), _share.get()),
-        Int(1)
+        Int(1),
     )
 
 
@@ -60,7 +66,7 @@ def approval():
     action_router = Cond(
         [And(Txn.application_args[0] == Bytes("create"), from_creator), create_nft()],
         [
-            And(Txn.application_args[0] == Bytes("set_policy"), from_creator),
+            And(Txn.application_args[0] == set_policy_selector, from_creator),
             set_policy(),
         ],
         [And(Txn.application_args[0] == Bytes("move"), from_creator), move()],
@@ -84,8 +90,10 @@ def clear():
 def get_approval():
     return compileTeal(approval(), mode=Mode.Application, version=6)
 
+
 def get_clear():
     return compileTeal(clear(), mode=Mode.Application, version=6)
+
 
 if __name__ == "__main__":
     print(get_approval())

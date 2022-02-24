@@ -42,6 +42,7 @@ def create_app(
 
     return result["application-index"]
 
+
 def update_app(
     client: algod.AlgodClient, app_id: int, addr: str, pk: str, get_approval, get_clear
 ) -> int:
@@ -57,7 +58,7 @@ def update_app(
     clear_bytes = base64.b64decode(clear_result["result"])
 
     # Create the transaction
-    create_txn = ApplicationUpdateTxn(        
+    create_txn = ApplicationUpdateTxn(
         addr,
         sp,
         app_id,
@@ -89,9 +90,9 @@ def delete_app(client: algod.AlgodClient, app_id: int, addr: str, pk: str):
     return wait_for_confirmation(client, txid, 4)
 
 
-def destroy_apps(client: algod.AlgodClient, addr: str, pk:str):
+def destroy_apps(client: algod.AlgodClient, addr: str, pk: str):
     acct = client.account_info(addr)
 
     # Delete all apps created by this account
-    for app in acct['created-apps']:
-        delete_app(client, app['id'], addr, pk)
+    for app in acct["created-apps"]:
+        delete_app(client, app["id"], addr, pk)
