@@ -5,8 +5,10 @@
             "name":"set_policy",
             "desc":"Sets the royalty policy for a given app id",
             "args":[
-                {"name":"royalty_asset", "type":"asset"}, 
-                {"name":"policy", "type":"((address,uint64)[],uint8[])"}
+                {"name":"royalty_asset", "type":"uint64"}, 
+                {"name":"royalty_receiver", "type":"address"},
+                {"name":"royalty_share", "type":"uint64"},
+                {"name":"allowed_assets", "type":"uint64[]"}
             ],
             "returns":{"type":"void"}
         },
@@ -15,10 +17,10 @@
             "desc":"Transfers an Asset from one account to another and enforces royalty payments",
             "args":[
                 {"name":"royalty_asset", "type":"asset"}, 
-                {"name":"from", "type":"address"},
-                {"name":"to", "type":"address"},
-                {"name":"payment", "type":"txn"},
-                {"name":"extra_app_calls", "type":"uint8[]"}
+                {"name":"owner_acct", "type":"account"},
+                {"name":"buyer_acct", "type":"account"},
+                {"name":"royalty_acct", "type":"account"},
+                {"name":"payment", "type":"txn"}
             ],
             "returns":{"type":"void"}
         }

@@ -5,7 +5,7 @@ from algosdk.future.transaction import *
 from algosdk.atomic_transaction_composer import *
 from algosdk.abi import *
 from sandbox import get_accounts
-from deploy import create_app
+from deploy import create_app, delete_app
 from contract import get_approval, get_clear
 
 client = AlgodClient("a" * 64, "http://localhost:4001")
@@ -22,6 +22,8 @@ def main():
     # Get accounts
     accts = get_accounts()
     addr, pk = accts[0]
+
+    buyer_addr, buyer_pk = accts[2]
 
     # Create application
     app_id = create_app(client, addr, pk, get_approval, get_clear)
@@ -49,11 +51,6 @@ def main():
     with open("royalty.json") as f:
         iface = Interface.from_json(f.read())
 
-    policy = [
-        ("H3ZG43FTOAIYKCL263DSF3V2ZQCFHXGIAWKIGFCNGL2WBBG67YE6FK3MTI", 10),
-        ("PJZ7WTR5XLK6XGSWA7TPFKNS4RA2NASZT6SPCUNBXUZCFSXBV2XVOOAMBE", 10),
-    ]
-
     atc = AtomicTransactionComposer()
     signer = AccountTransactionSigner(pk)
     atc.add_method_call(
@@ -62,15 +59,38 @@ def main():
         addr,
         sp,
         signer,
-        method_args=[created_nft_id, (policy, [])],
+        method_args=[created_nft_id, addr, 10, []],
     )
-    stxns = atc.gather_signatures()
 
-    drr = create_dryrun(client, stxns)
-    dr_resp = dryrun_results.DryrunResponse(client.dryrun(drr))
+    atc.execute(client, 2)
 
-    print(dr_resp.txns[0].__dict__)
-    print(dr_resp.txns[0].app_trace(spaces=0))
+    atc = AtomicTransactionComposer()
+    optin = TransactionWithSigner(
+        txn=AssetTransferTxn(buyer_addr, sp, buyer_addr, 0, created_nft_id),
+        signer=AccountTransactionSigner(buyer_pk),
+    )
+
+    atc.add_transaction(optin)
+
+    ptxn = TransactionWithSigner(
+        txn=PaymentTxn(buyer_addr, sp, app_addr, int(1e10)),
+        signer=AccountTransactionSigner(buyer_pk),
+    )
+    atc.add_method_call(
+        app_id,
+        get_method(iface, "transfer"),
+        addr,
+        sp,
+        signer,
+        method_args=[created_nft_id, app_addr, buyer_addr, addr, ptxn],
+    )
+
+    atc_res = atc.execute(client, 2)
+    for r in atc_res.abi_results:
+        if "logs" in r.tx_info:
+            print(r.tx_info["logs"])
+
+    delete_app(client, app_id, addr, pk)
 
 
 if __name__ == "__main__":

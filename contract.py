@@ -1,6 +1,12 @@
 from pyteal import *
 
 
+asset_key = Bytes("royalty_asset")
+recv_key = Bytes("royalty_receiver")
+share_key = Bytes("royalty_share")
+allowed_key = Bytes("allowed_assets")
+
+
 @Subroutine(TealType.uint64)
 def create_nft():
     return Seq(
@@ -23,55 +29,110 @@ def create_nft():
     )
 
 
-addr = abi.Address()
-share = abi.Uint64()
-participant = abi.Tuple(addr, share)
-share_policy = abi.DynamicArray(participant)
-
-asset_id = abi.Uint8()
-asset_policy = abi.DynamicArray(asset_id)
-
-royalty_policy = abi.Tuple(share_policy, asset_policy)
-
-set_policy_selector = MethodSignature("set_policy(asset,{})void".format(royalty_policy))
+set_policy_selector = MethodSignature("set_policy(uint64,address,uint64,uint64[])void")
 
 
 @Subroutine(TealType.uint64)
 def set_policy():
-    asset_id = Txn.assets[Btoi(Txn.application_args[1])]
+    asset_id = Txn.application_args[1]
+    recv = Txn.application_args[2]
+    share = Txn.application_args[3]
+    assets = Txn.application_args[4]
     return Seq(
-        # Just stuff the whole thing in for now, eventually will need more space for this (>120 bytes)
-        App.globalPut(Itob(asset_id), Txn.application_args[2]),
+        App.globalPut(asset_key, asset_id),
+        App.globalPut(recv_key, recv),
+        App.globalPut(share_key, share),
+        App.globalPut(allowed_key, assets),
         Int(1),
     )
 
 
-transfer_selector = MethodSignature("transfer(asset,address,address,txn,uint8[])void")
-
-app_refs = abi.DynamicArray(abi.Uint8())
+transfer_selector = MethodSignature("transfer(asset,account,account,account,txn)void")
 
 
 @Subroutine(TealType.uint64)
 def transfer():
-    asset_ref = Btoi(Txn.application_args[1])
-    sender = Txn.application_args[2]
-    receiver = Txn.application_args[3]
-    payment_ref = Btoi(Txn.application_args[4])
-    extra_app_refs = app_refs.decode(Txn.application_args[5])
+    asset_id = Txn.assets[Btoi(Txn.application_args[1])]
+    owner_acct = Txn.accounts[Btoi(Txn.application_args[2])]
+    buyer_acct = Txn.accounts[Btoi(Txn.application_args[3])]
+    royalty_acct = Txn.accounts[Btoi(Txn.application_args[4])]
+    payment_txn = Gtxn[Txn.group_index() - Int(1)]
 
-    _policy = royalty_policy.new_instance()
-    _share_policy = share_policy.new_instance()
     return Seq(
-        _policy.decode(App.globalGet(Itob(Txn.assets[asset_ref]))),
-        _policy[0].store_into(_share_policy),
-        Int(1)
+        # TODO: add validation checks to make sure it all looks right
+        # sender should be current owner
+        # payment should be from buyer
+        # no funny biz with closes and rekey'd accts not allowed?
+        move_asset(asset_id, owner_acct, buyer_acct),
+        If(
+            payment_txn.type_enum() == TxnType.Payment,
+            make_algo_payment(
+                royalty_acct,
+                get_share_amount(payment_txn.amount(), Btoi(App.globalGet(share_key))),
+            ),
+            make_asset_payment(
+                royalty_acct,
+                payment_txn.xfer_asset(),
+                get_share_amount(
+                    payment_txn.asset_amount(), Btoi(App.globalGet(share_key))
+                ),
+            ),
+        ),
+        Int(1),
     )
 
 
+@Subroutine(TealType.none)
+def move_asset(asset_id, owner, buyer):
+    return Seq(
+        InnerTxnBuilder.Begin(),
+        InnerTxnBuilder.SetFields(
+            {
+                TxnField.type_enum: TxnType.AssetTransfer,
+                TxnField.xfer_asset: asset_id,
+                TxnField.asset_amount: Int(1),
+                TxnField.asset_sender: owner,
+                TxnField.asset_receiver: buyer,
+            }
+        ),
+        InnerTxnBuilder.Submit(),
+    )
+
 
 @Subroutine(TealType.uint64)
-def move():
-    return Int(1)
+def get_share_amount(total, share):
+    return WideRatio([total], [share, Int(10000)])
+
+
+@Subroutine(TealType.none)
+def make_algo_payment(to, amount):
+    return Seq(
+        InnerTxnBuilder.Begin(),
+        InnerTxnBuilder.SetFields(
+            {
+                TxnField.type_enum: TxnType.Payment,
+                TxnField.receiver: to,
+                TxnField.amount: amount,
+            }
+        ),
+        InnerTxnBuilder.Submit(),
+    )
+
+
+@Subroutine(TealType.none)
+def make_asset_payment(to, asa_id, amount):
+    return Seq(
+        InnerTxnBuilder.Begin(),
+        InnerTxnBuilder.SetFields(
+            {
+                TxnField.type_enum: TxnType.AssetTransfer,
+                TxnField.xfer_asset: asa_id,
+                TxnField.asset_receiver: to,
+                TxnField.asset_amount: amount,
+            }
+        ),
+        InnerTxnBuilder.Submit(),
+    )
 
 
 def approval():
@@ -83,13 +144,12 @@ def approval():
             And(Txn.application_args[0] == set_policy_selector, from_creator),
             set_policy(),
         ],
-        [And(Txn.application_args[0] == Bytes("move"), from_creator), move()],
-        [Txn.application_args[0] == Bytes("transfer"), transfer()],
+        [Txn.application_args[0] == transfer_selector, transfer()],
     )
 
     return Cond(
         [Txn.application_id() == Int(0), Approve()],
-        [Txn.on_completion() == OnComplete.DeleteApplication, Reject()],
+        [Txn.on_completion() == OnComplete.DeleteApplication, Return(from_creator)],
         [Txn.on_completion() == OnComplete.UpdateApplication, Return(from_creator)],
         [Txn.on_completion() == OnComplete.OptIn, Reject()],
         [Txn.on_completion() == OnComplete.CloseOut, Reject()],
