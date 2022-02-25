@@ -59,14 +59,14 @@ def transfer():
     payment_ref = Btoi(Txn.application_args[4])
     extra_app_refs = app_refs.decode(Txn.application_args[5])
 
-    policy = royalty_policy.new_instance()
-
+    _policy = royalty_policy.new_instance()
+    _share_policy = share_policy.new_instance()
     return Seq(
-        policy.decode(App.globalGet(Itob(Txn.assets[asset_ref]))),
-        policy[0].store_into(),
+        _policy.decode(App.globalGet(Itob(Txn.assets[asset_ref]))),
+        _policy[0].store_into(_share_policy),
+        Int(1)
     )
 
-    return Int(1)
 
 
 @Subroutine(TealType.uint64)
