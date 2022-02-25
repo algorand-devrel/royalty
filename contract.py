@@ -23,35 +23,49 @@ def create_nft():
     )
 
 
-addr = abi.Byte()
+addr = abi.Address()
 share = abi.Uint64()
 participant = abi.Tuple(addr, share)
+share_policy = abi.DynamicArray(participant)
 
-policy = abi.DynamicArray(participant)
+asset_id = abi.Uint8()
+asset_policy = abi.DynamicArray(asset_id)
 
-set_policy_selector = MethodSignature(
-    "set_policy(asset,(address,uint64)[],uint64[])void"
-)
+royalty_policy = abi.Tuple(share_policy, asset_policy)
+
+set_policy_selector = MethodSignature("set_policy(asset,{})void".format(royalty_policy))
 
 
 @Subroutine(TealType.uint64)
 def set_policy():
-    _participant = participant.new_instance()
-    _share = share.new_instance()
-    _addr = addr.new_instance()
-
+    asset_id = Txn.assets[Btoi(Txn.application_args[1])]
     return Seq(
-        policy.decode(Txn.application_args[1]),
-        policy[0].store_into(_participant),
-        _participant[0].store_into(_addr),
-        _participant[1].store_into(_share),
-        App.globalPut(Itob(_addr.get()), _share.get()),
+        # Just stuff the whole thing in for now, eventually will need more space for this (>120 bytes)
+        App.globalPut(Itob(asset_id), Txn.application_args[2]),
         Int(1),
     )
 
 
+transfer_selector = MethodSignature("transfer(asset,address,address,txn,uint8[])void")
+
+app_refs = abi.DynamicArray(abi.Uint8())
+
+
 @Subroutine(TealType.uint64)
 def transfer():
+    asset_ref = Btoi(Txn.application_args[1])
+    sender = Txn.application_args[2]
+    receiver = Txn.application_args[3]
+    payment_ref = Btoi(Txn.application_args[4])
+    extra_app_refs = app_refs.decode(Txn.application_args[5])
+
+    policy = royalty_policy.new_instance()
+
+    return Seq(
+        policy.decode(App.globalGet(Itob(Txn.assets[asset_ref]))),
+        policy[0].store_into(),
+    )
+
     return Int(1)
 
 

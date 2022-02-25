@@ -62,10 +62,15 @@ def main():
         addr,
         sp,
         signer,
-        method_args=[created_nft_id, policy, []],
+        method_args=[created_nft_id, (policy, [])],
     )
-    result = atc.execute(client, 2)
-    print(result)
+    stxns = atc.gather_signatures()
+
+    drr = create_dryrun(client, stxns)
+    dr_resp = dryrun_results.DryrunResponse(client.dryrun(drr))
+
+    print(dr_resp.txns[0].__dict__)
+    print(dr_resp.txns[0].app_trace(spaces=0))
 
 
 if __name__ == "__main__":

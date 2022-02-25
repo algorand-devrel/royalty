@@ -6,8 +6,7 @@
             "desc":"Sets the royalty policy for a given app id",
             "args":[
                 {"name":"royalty_asset", "type":"asset"}, 
-                {"name":"policy", "type":"(address,uint64)[]"},
-                {"name":"acceptable_assets", "type":"uint64[]"}
+                {"name":"policy", "type":"((address,uint64)[],uint8[])"}
             ],
             "returns":{"type":"void"}
         },
@@ -19,7 +18,7 @@
                 {"name":"from", "type":"address"},
                 {"name":"to", "type":"address"},
                 {"name":"payment", "type":"txn"},
-                {"name":"extra_app_calls", "type":"appl"}
+                {"name":"extra_app_calls", "type":"uint8[]"}
             ],
             "returns":{"type":"void"}
         }
