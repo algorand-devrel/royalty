@@ -51,6 +51,7 @@ def main():
     with open("royalty.json") as f:
         iface = Interface.from_json(f.read())
 
+    # Set the royalty policy
     atc = AtomicTransactionComposer()
     signer = AccountTransactionSigner(pk)
     atc.add_method_call(
@@ -61,21 +62,22 @@ def main():
         signer,
         method_args=[created_nft_id, addr, 10, []],
     )
-
     atc.execute(client, 2)
 
+
+    # Perform a transfer using the application
     atc = AtomicTransactionComposer()
-    optin = TransactionWithSigner(
+    # First opt buyer into asset
+    atc.add_transaction(TransactionWithSigner(
         txn=AssetTransferTxn(buyer_addr, sp, buyer_addr, 0, created_nft_id),
         signer=AccountTransactionSigner(buyer_pk),
-    )
-
-    atc.add_transaction(optin)
-
+    ))
+    # Payment Transaction to cover purchase of NFT
     ptxn = TransactionWithSigner(
         txn=PaymentTxn(buyer_addr, sp, app_addr, int(1e10)),
         signer=AccountTransactionSigner(buyer_pk),
     )
+    # Actual transfer method call
     atc.add_method_call(
         app_id,
         get_method(iface, "transfer"),
@@ -84,14 +86,10 @@ def main():
         signer,
         method_args=[created_nft_id, app_addr, buyer_addr, addr, ptxn],
     )
+    atc.execute(client, 2)
 
-    atc_res = atc.execute(client, 2)
-    for r in atc_res.abi_results:
-        if "logs" in r.tx_info:
-            print(r.tx_info["logs"])
-
+    # Destroy app, we're done with it
     delete_app(client, app_id, addr, pk)
-
 
 if __name__ == "__main__":
     main()
