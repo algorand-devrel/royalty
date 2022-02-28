@@ -5,10 +5,13 @@
             "name":"set_policy",
             "desc":"Sets the royalty policy for a given app id",
             "args":[
-                {"name":"royalty_asset", "type":"uint64"}, 
+                {"name":"royalty_asset", "type":"asset"}, 
                 {"name":"royalty_receiver", "type":"address"},
                 {"name":"royalty_share", "type":"uint64"},
-                {"name":"allowed_assets", "type":"uint64[]"}
+                {"name":"allowed_asset_1", "type":"asset"},
+                {"name":"allowed_asset_2", "type":"asset"},
+                {"name":"allowed_asset_3", "type":"asset"},
+                {"name":"allowed_asset_4", "type":"asset"}
             ],
             "returns":{"type":"void"}
         },
@@ -20,7 +23,7 @@
                 {"name":"owner_acct", "type":"account"},
                 {"name":"buyer_acct", "type":"account"},
                 {"name":"royalty_acct", "type":"account"},
-                {"name":"payment", "type":"txn"}
+                {"name":"payment_txn", "type":"txn"}
             ],
             "returns":{"type":"void"}
         }

@@ -6,6 +6,9 @@ recv_key = Bytes("royalty_receiver")
 share_key = Bytes("royalty_share")
 allowed_key = Bytes("allowed_assets")
 
+# A basis point is 1/100 of 1%
+basis_point_multiplier = 100 * 100
+
 
 @Subroutine(TealType.uint64)
 def create_nft():
@@ -29,20 +32,44 @@ def create_nft():
     )
 
 
-set_policy_selector = MethodSignature("set_policy(uint64,address,uint64,uint64[])void")
+set_policy_selector = MethodSignature(
+    "set_policy(asset,address,uint64,asset,asset,asset,asset)void"
+)
 
 
 @Subroutine(TealType.uint64)
 def set_policy():
-    asset_id = Txn.application_args[1]
+    # TODO: this opts in any assets we need to but we arent opting out of assets from any
+    # previous policy
+
+    royalty_asset = Txn.assets[Btoi(Txn.application_args[1])]
     recv = Txn.application_args[2]
     share = Txn.application_args[3]
-    assets = Txn.application_args[4]
+
+    buff = ScratchVar(TealType.bytes)
+    curr_asset = ScratchVar(TealType.uint64)
+
     return Seq(
-        App.globalPut(asset_key, asset_id),
-        App.globalPut(recv_key, recv),
-        App.globalPut(share_key, share),
-        App.globalPut(allowed_key, assets),
+        Assert(Btoi(share) < Int(basis_point_multiplier)),  # cant be > 10k
+        buff.store(Bytes("")),
+        ensure_opted_in(royalty_asset),
+        For(
+            (i := ScratchVar()).store(Int(4)),
+            i.load() < Txn.application_args.length(),
+            i.store(i.load() + Int(1)),
+        ).Do(
+            Seq(
+                curr_asset.store(Txn.assets[Btoi(Txn.application_args[i.load()])]),
+                If(
+                    curr_asset.load() != Int(0),
+                    Seq(
+                        ensure_opted_in(curr_asset.load()),
+                        buff.store(Concat(buff.load(), Itob(curr_asset.load()))),
+                    ),
+                ),
+            )
+        ),
+        App.globalPut(Itob(royalty_asset), Concat(recv, share, buff.load())),
         Int(1),
     )
 
@@ -56,29 +83,175 @@ def transfer():
     owner_acct = Txn.accounts[Btoi(Txn.application_args[2])]
     buyer_acct = Txn.accounts[Btoi(Txn.application_args[3])]
     royalty_acct = Txn.accounts[Btoi(Txn.application_args[4])]
-    payment_txn = Gtxn[Txn.group_index() - Int(1)]
+    purchase_txn = Gtxn[Txn.group_index() - Int(1)]
 
-    return Seq(
-        # TODO: add validation checks to make sure it all looks right
-        # sender should be current owner
-        # payment should be from buyer
-        # no funny biz with closes and rekey'd accts not allowed?
-        move_asset(asset_id, owner_acct, buyer_acct),
-        If(
-            payment_txn.type_enum() == TxnType.Payment,
-            make_algo_payment(
-                royalty_acct,
-                get_share_amount(payment_txn.amount(), Btoi(App.globalGet(share_key))),
+    policy = App.globalGet(Itob(asset_id))
+
+    valid_transfer_group = And(
+        # App call signed by current owner
+        # Txn.sender() == owner_acct,
+        # No funny business
+        purchase_txn.rekey_to() == Global.zero_address(),
+        # payment txn should be from buyer
+        purchase_txn.sender() == buyer_acct,
+        # Passed the correct account according to the policy
+        Or(
+            And(
+                purchase_txn.type_enum() == TxnType.AssetTransfer,
+                # Just to be sure
+                purchase_txn.asset_close_to() == Global.zero_address(),
+                # Is this a valid asset id according to the spec?
+                in_approved_list(purchase_txn.xfer_asset(), policy),
+                # Make sure payments go to the right participants
+                purchase_txn.asset_receiver() == Global.current_application_address(),
             ),
-            make_asset_payment(
-                royalty_acct,
-                payment_txn.xfer_asset(),
-                get_share_amount(
-                    payment_txn.asset_amount(), Btoi(App.globalGet(share_key))
-                ),
+            And(
+                purchase_txn.type_enum() == TxnType.Payment,
+                # Just to be sure
+                purchase_txn.close_remainder_to() == Global.zero_address(),
+                # Make sure payments are going to the right participants
+                purchase_txn.receiver() == Global.current_application_address(),
             ),
         ),
+        correct_royalty_receiver(royalty_acct, policy),
+    )
+
+    owner_auth = AccountParam.authAddr(owner_acct)
+    buyer_auth = AccountParam.authAddr(buyer_acct)
+
+    return Seq(
+        owner_auth,
+        buyer_auth,
+        #  Make sure we have address(32 bytes) and royalty amount(8 bytes)
+        #  may have additional allowed assets
+        Assert(Len(policy) >= Int(40)),
+        # Make sure transactions look right
+        Assert(valid_transfer_group),
+        # Make sure neither owner/buyer have been rekeyed
+        Assert(owner_auth.value() == Global.zero_address()),
+        Assert(buyer_auth.value() == Global.zero_address()),
+        # Make royalty payment
+        If(
+            purchase_txn.type_enum() == TxnType.AssetTransfer,
+            pay_assets(
+                purchase_txn.xfer_asset(),
+                purchase_txn.asset_amount(),
+                owner_acct,
+                royalty_acct,
+                policy,
+            ),
+            pay_algos(purchase_txn.amount(), owner_acct, royalty_acct, policy),
+        ),
+        # Perform asset move
+        move_asset(asset_id, owner_acct, buyer_acct),
         Int(1),
+    )
+
+
+@Subroutine(TealType.none)
+def ensure_opted_in(asset_id):
+    bal = AssetHolding.balance(Global.current_application_address(), asset_id)
+    return Seq(
+        bal,
+        If(
+            Not(bal.hasValue()),
+            Seq(
+                InnerTxnBuilder.Begin(),
+                InnerTxnBuilder.SetFields(
+                    {
+                        TxnField.type_enum: TxnType.AssetTransfer,
+                        TxnField.xfer_asset: asset_id,
+                        TxnField.asset_amount: Int(0),
+                        TxnField.asset_receiver: Global.current_application_address(),
+                    }
+                ),
+                InnerTxnBuilder.Submit(),
+            ),
+        ),
+    )
+
+
+@Subroutine(TealType.none)
+def pay_assets(purchase_asset_id, purchase_amt, owner, royalty_receiver, policy):
+    royalty_amt = ScratchVar()
+    return Seq(
+        royalty_amt.store(royalty_amount(purchase_amt, policy)),
+        InnerTxnBuilder.Begin(),
+        InnerTxnBuilder.SetFields(
+            {
+                TxnField.type_enum: TxnType.AssetTransfer,
+                TxnField.xfer_asset: purchase_asset_id,
+                TxnField.asset_amount: purchase_amt - royalty_amt.load(),
+                TxnField.asset_receiver: owner,
+            }
+        ),
+        InnerTxnBuilder.Next(),
+        InnerTxnBuilder.SetFields(
+            {
+                TxnField.type_enum: TxnType.AssetTransfer,
+                TxnField.xfer_asset: purchase_asset_id,
+                TxnField.asset_amount: royalty_amt.load(),
+                TxnField.asset_receiver: royalty_receiver,
+            }
+        ),
+        InnerTxnBuilder.Submit(),
+    )
+
+
+@Subroutine(TealType.none)
+def pay_algos(purchase_amt, owner, royalty_receiver, policy):
+    royalty_amt = ScratchVar()
+    return Seq(
+        royalty_amt.store(royalty_amount(purchase_amt, policy)),
+        InnerTxnBuilder.Begin(),
+        InnerTxnBuilder.SetFields(
+            {
+                TxnField.type_enum: TxnType.Payment,
+                TxnField.amount: purchase_amt - royalty_amt.load(),
+                TxnField.receiver: owner,
+            }
+        ),
+        InnerTxnBuilder.Next(),
+        InnerTxnBuilder.SetFields(
+            {
+                TxnField.type_enum: TxnType.Payment,
+                TxnField.amount: royalty_amt.load(),
+                TxnField.receiver: royalty_receiver,
+            }
+        ),
+        InnerTxnBuilder.Submit(),
+    )
+
+
+@Subroutine(TealType.uint64)
+def royalty_amount(payment_amt, policy):
+    return WideRatio(
+        [payment_amt], [ExtractUint64(policy, Int(32)), Int(basis_point_multiplier)]
+    )
+
+
+@Subroutine(TealType.uint64)
+def correct_royalty_receiver(addr, policy):
+    # First 32 bytes are the royalty receiver
+    return Extract(policy, Int(0), Int(32)) == addr
+
+
+@Subroutine(TealType.uint64)
+def in_approved_list(asset_id, policy):
+    # Iterate over policy[40:] 8 bytes at a time to check
+    # if the asset id is allowed
+    i = ScratchVar()
+    init = i.store(Int(0))
+    cond = i.load() < (Len(policy) - Int(40)) / Int(8)
+    iter = i.store(i.load() + Int(1))
+    return Seq(
+        For(init, cond, iter).Do(
+            If(
+                ExtractUint64(policy, Int(40) + i.load() * Int(8)) == asset_id,
+                Return(Int(1)),
+            )
+        ),
+        Int(0),
     )
 
 
@@ -93,42 +266,6 @@ def move_asset(asset_id, owner, buyer):
                 TxnField.asset_amount: Int(1),
                 TxnField.asset_sender: owner,
                 TxnField.asset_receiver: buyer,
-            }
-        ),
-        InnerTxnBuilder.Submit(),
-    )
-
-
-@Subroutine(TealType.uint64)
-def get_share_amount(total, share):
-    return WideRatio([total], [share, Int(10000)])
-
-
-@Subroutine(TealType.none)
-def make_algo_payment(to, amount):
-    return Seq(
-        InnerTxnBuilder.Begin(),
-        InnerTxnBuilder.SetFields(
-            {
-                TxnField.type_enum: TxnType.Payment,
-                TxnField.receiver: to,
-                TxnField.amount: amount,
-            }
-        ),
-        InnerTxnBuilder.Submit(),
-    )
-
-
-@Subroutine(TealType.none)
-def make_asset_payment(to, asa_id, amount):
-    return Seq(
-        InnerTxnBuilder.Begin(),
-        InnerTxnBuilder.SetFields(
-            {
-                TxnField.type_enum: TxnType.AssetTransfer,
-                TxnField.xfer_asset: asa_id,
-                TxnField.asset_receiver: to,
-                TxnField.asset_amount: amount,
             }
         ),
         InnerTxnBuilder.Submit(),
