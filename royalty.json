@@ -2,6 +2,22 @@
     "name":"arc-1337",
     "methods":[
         {
+            "name":"create_nft",
+            "desc":"Create an nft with appropriate parameters, return its id",
+            "args":[],
+            "returns":{"name":"asset-id", "type":"uint64"}
+        },
+        {
+            "name":"move",
+            "desc":"Moves the asset passed from one account to another",
+            "args":[
+                {"name":"royalty_asset", "type":"asset"}, 
+                {"name":"from", "type":"account"},
+                {"name":"to", "type":"account"}
+            ],
+            "returns":{"type":"void"}
+        },
+        {
             "name":"set_policy",
             "desc":"Sets the royalty policy for a given app id",
             "args":[

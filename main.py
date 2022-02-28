@@ -30,6 +30,9 @@ def main():
 
     buyer_addr, buyer_pk = accts[2]
 
+    addr_signer = AccountTransactionSigner(pk)
+    buyer_signer = AccountTransactionSigner(buyer_pk)
+
     # Create application
     app_id = create_app(client, addr, pk, get_approval, get_clear)
     app_addr = logic.get_application_address(app_id)
@@ -37,34 +40,50 @@ def main():
 
     # Create NFT
     sp = client.suggested_params()
-    pay_txn = PaymentTxn(addr, sp, app_addr, int(1e8))
-    app_txn = ApplicationCallTxn(
-        addr, sp, app_id, OnComplete.NoOpOC, app_args=["create"]
+    atc = AtomicTransactionComposer()
+    atc.add_transaction(
+        TransactionWithSigner(
+            txn=PaymentTxn(addr, sp, app_addr, int(1e8)), signer=addr_signer
+        )
     )
-    signed = [txn.sign(pk) for txn in assign_group_id([pay_txn, app_txn])]
-    txids = [tx.get_txid() for tx in signed]
+    atc.add_method_call(app_id, get_method(iface, "create_nft"), addr, sp, addr_signer)
+    results = atc.execute(client, 2)
 
-    client.send_transactions(signed)
-
-    results = [wait_for_confirmation(client, txid, 4) for txid in txids]
-
-    created_nft_id = results[1]["inner-txns"][0]["asset-index"]
+    created_nft_id = results.abi_results[0].return_value
     print("Created nft {}".format(created_nft_id))
 
+    print("Calling move method")
+    sp = client.suggested_params()
+    atc = AtomicTransactionComposer()
+    atc.add_transaction(
+        TransactionWithSigner(
+            txn=AssetTransferTxn(addr, sp, addr, 0, created_nft_id), signer=addr_signer
+        )
+    )
+    atc.add_method_call(
+        app_id,
+        get_method(iface, "move"),
+        addr,
+        sp,
+        addr_signer,
+        [created_nft_id, app_addr, addr],
+    )
+    atc.execute(client, 2)
+
+    print("Calling set_policy method")
     # Set the royalty policy
     atc = AtomicTransactionComposer()
-    signer = AccountTransactionSigner(pk)
     atc.add_method_call(
         app_id,
         get_method(iface, "set_policy"),
         addr,
         sp,
-        signer,
+        addr_signer,
         method_args=[created_nft_id, addr, 1000, 0, 0, 0, 0],
     )
     atc.execute(client, 2)
 
-    print("Policy set, creating transfer call")
+    print("Calling transfer")
 
     # Perform a transfer using the application
     atc = AtomicTransactionComposer()
@@ -72,13 +91,13 @@ def main():
     atc.add_transaction(
         TransactionWithSigner(
             txn=AssetTransferTxn(buyer_addr, sp, buyer_addr, 0, created_nft_id),
-            signer=AccountTransactionSigner(buyer_pk),
+            signer=buyer_signer,
         )
     )
     # Payment Transaction to cover purchase of NFT
     ptxn = TransactionWithSigner(
         txn=PaymentTxn(buyer_addr, sp, app_addr, int(1e10)),
-        signer=AccountTransactionSigner(buyer_pk),
+        signer=buyer_signer,
     )
     # Actual transfer method call
     atc.add_method_call(
@@ -86,17 +105,17 @@ def main():
         get_method(iface, "transfer"),
         addr,
         sp,
-        signer,
-        method_args=[created_nft_id, app_addr, buyer_addr, addr, ptxn],
+        addr_signer,
+        method_args=[created_nft_id, addr, buyer_addr, addr, ptxn],
     )
-    txns = atc.gather_signatures()
-    dr_req = create_dryrun(client, txns)
-    dr_resp = client.dryrun(dr_req)
-    drr = DryrunResponse(dr_resp)
-    for txn in drr.txns:
-        print(txn.app_trace(spaces=0))
+    atc.execute(client, 2)
 
-    # atc.execute(client, 2)
+    # txns = atc.gather_signatures()
+    # dr_req = create_dryrun(client, txns)
+    # dr_resp = client.dryrun(dr_req)
+    # drr = DryrunResponse(dr_resp)
+    # for txn in drr.txns:
+    #    print(txn.app_trace(spaces=0))
 
     # Destroy app, we're done with it
     # delete_app(client, app_id, addr, pk)

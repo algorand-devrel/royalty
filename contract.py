@@ -9,6 +9,11 @@ allowed_key = Bytes("allowed_assets")
 # A basis point is 1/100 of 1%
 basis_point_multiplier = 100 * 100
 
+return_prefix = Bytes("base16", "0x151f7c75")  # Literally hash('return')[:4]
+
+
+create_selector = MethodSignature("create_nft()uint64")
+
 
 @Subroutine(TealType.uint64)
 def create_nft():
@@ -28,6 +33,7 @@ def create_nft():
             }
         ),
         InnerTxnBuilder.Submit(),
+        Log(Concat(return_prefix, Itob(InnerTxn.created_asset_id()))),
         Int(1),
     )
 
@@ -89,7 +95,7 @@ def transfer():
 
     valid_transfer_group = And(
         # App call signed by current owner
-        # Txn.sender() == owner_acct,
+        Txn.sender() == owner_acct,
         # No funny business
         purchase_txn.rekey_to() == Global.zero_address(),
         # payment txn should be from buyer
@@ -146,6 +152,17 @@ def transfer():
         move_asset(asset_id, owner_acct, buyer_acct),
         Int(1),
     )
+
+
+move_selector = MethodSignature("move(asset,account,account)void")
+
+
+@Subroutine(TealType.uint64)
+def move():
+    asset_id = Txn.assets[Btoi(Txn.application_args[1])]
+    from_acct = Txn.accounts[Btoi(Txn.application_args[2])]
+    to_acct = Txn.accounts[Btoi(Txn.application_args[3])]
+    return Seq(move_asset(asset_id, from_acct, to_acct), Int(1))
 
 
 @Subroutine(TealType.none)
@@ -276,7 +293,8 @@ def approval():
     from_creator = Txn.sender() == Global.creator_address()
 
     action_router = Cond(
-        [And(Txn.application_args[0] == Bytes("create"), from_creator), create_nft()],
+        [And(Txn.application_args[0] == create_selector, from_creator), create_nft()],
+        [And(Txn.application_args[0] == move_selector, from_creator), move()],
         [
             And(Txn.application_args[0] == set_policy_selector, from_creator),
             set_policy(),
