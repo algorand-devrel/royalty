@@ -3,6 +3,35 @@ from algosdk import algod
 from algosdk.future.transaction import *
 
 
+def create_asa(
+    client: algod.AlgodClient, addr: str, pk: str, name: str, unit_name: str, total: int, decimals: int
+) -> int:
+    # Get suggested params from network
+    sp = client.suggested_params()
+
+    # Create the transaction
+    create_txn = AssetCreateTxn(
+        addr,
+        sp,
+        total,
+        decimals,
+        False,
+        unit_name=unit_name,
+        asset_name=name,
+    )
+
+    # Sign it
+    signed_txn = create_txn.sign(pk)
+
+    # Send it
+    txid = client.send_transaction(signed_txn)
+
+    # Wait for the result so we can return the asset id
+    result = wait_for_confirmation(client, txid, 4)
+
+    return result["asset-index"]
+
+
 def create_app(
     client: algod.AlgodClient, addr: str, pk: str, get_approval, get_clear
 ) -> int:

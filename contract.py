@@ -80,7 +80,7 @@ def set_policy():
     )
 
 
-transfer_selector = MethodSignature("transfer(asset,account,account,account,txn)void")
+transfer_selector = MethodSignature("transfer(asset,account,account,account,txn,asset)void")
 
 
 @Subroutine(TealType.uint64)

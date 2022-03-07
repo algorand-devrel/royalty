@@ -3,10 +3,10 @@ from algosdk import *
 from algosdk.v2client.algod import *
 from algosdk.future.transaction import *
 from algosdk.atomic_transaction_composer import *
-from algosdk.dryrun_results import DryrunResponse
+#from algosdk.dryrun_results import DryrunResponse
 from algosdk.abi import *
 from sandbox import get_accounts
-from deploy import create_app, delete_app
+from deploy import create_asa, create_app, delete_app
 from contract import get_approval, get_clear
 
 client = AlgodClient("a" * 64, "http://localhost:4001")
@@ -32,6 +32,25 @@ def main():
 
     addr_signer = AccountTransactionSigner(pk)
     buyer_signer = AccountTransactionSigner(buyer_pk)
+
+    # Create FakeUSD
+    asset_id = create_asa(client, addr, pk, "FakeUSD", "FUSD", 1_000_000_000_000, 6)
+    print("Created ASA: {}".format(asset_id))
+
+    # Buyer OptIn and Receiver FUSD
+    sp = client.suggested_params()
+    atc = AtomicTransactionComposer()
+    atc.add_transaction(
+        TransactionWithSigner(
+            txn=AssetOptInTxn(buyer_addr, sp, asset_id), signer=buyer_signer
+        )
+    )
+    atc.add_transaction(
+        TransactionWithSigner(
+            txn=AssetTransferTxn(addr, sp, buyer_addr, 100_000_000_000, asset_id), signer=addr_signer
+        )
+    )
+    atc.execute(client, 2)
 
     # Create application
     app_id = create_app(client, addr, pk, get_approval, get_clear)
@@ -70,7 +89,7 @@ def main():
     )
     atc.execute(client, 2)
 
-    print("Calling set_policy method")
+    print("Calling set_policy method (Algo)")
     # Set the royalty policy
     atc = AtomicTransactionComposer()
     atc.add_method_call(
@@ -106,7 +125,62 @@ def main():
         addr,
         sp,
         addr_signer,
-        method_args=[created_nft_id, addr, buyer_addr, addr, ptxn],
+        method_args=[created_nft_id, addr, buyer_addr, addr, ptxn, 0],
+    )
+    atc.execute(client, 2)
+
+    # Reset owner of NFT for ASA demo.
+
+    print("Calling move method")
+    sp = client.suggested_params()
+    atc = AtomicTransactionComposer()
+    atc.add_method_call(
+        app_id,
+        get_method(iface, "move"),
+        addr,
+        sp,
+        addr_signer,
+        [created_nft_id, buyer_addr, addr],
+    )
+    atc.execute(client, 2)
+
+    print("Calling set_policy method (FakeUSD)")
+    # Set the royalty policy
+    atc = AtomicTransactionComposer()
+    atc.add_method_call(
+        app_id,
+        get_method(iface, "set_policy"),
+        addr,
+        sp,
+        addr_signer,
+        method_args=[created_nft_id, addr, 1000, asset_id, 0, 0, 0],
+    )
+    atc.execute(client, 2)
+
+    print("Calling transfer")
+
+    # Perform a transfer using the application
+    atc = AtomicTransactionComposer()
+    # First opt buyer into asset
+    atc.add_transaction(
+        TransactionWithSigner(
+            txn=AssetTransferTxn(buyer_addr, sp, buyer_addr, 0, created_nft_id),
+            signer=buyer_signer,
+        )
+    )
+    # Payment Transaction to cover purchase of NFT
+    ptxn = TransactionWithSigner(
+        txn=AssetTransferTxn(buyer_addr, sp, app_addr, int(1e10), asset_id),
+        signer=buyer_signer,
+    )
+    # Actual transfer method call
+    atc.add_method_call(
+        app_id,
+        get_method(iface, "transfer"),
+        addr,
+        sp,
+        addr_signer,
+        method_args=[created_nft_id, addr, buyer_addr, addr, ptxn, asset_id],
     )
     atc.execute(client, 2)
 
