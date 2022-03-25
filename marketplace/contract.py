@@ -1,19 +1,19 @@
 from pyteal import *
 
+
+app_key = Bytes("app")
+asset_key = Bytes("asset")
+amount_key = Bytes("amount")
+
 list_selector = MethodSignature("list(asset,application,uint64,appl)void")
 
 
+@Subroutine(TealType.uint64)
 def list_nft():
     asset_id = Txn.assets[Btoi(Txn.application_args[1])]
     app_id = Txn.assets[Btoi(Txn.application_args[2])]
     amount = Btoi(Txn.application_args[3])
     offer_txn = Gtxn[Txn.group_index() - Int(1)]
-
-    # Check that they have this asset
-    # Check that the freeze/clawback is the app id
-    # Check that the txn is an app call to that app id
-    # Check that the auth addr gets set to current_app_addr for this asset?
-
     asset_balance = AssetHolding.balance(Txn.sender(), asset_id)
     asset_freeze = AssetParam.freeze(asset_id)
     asset_clawback = AssetParam.clawback(asset_id)
@@ -27,24 +27,30 @@ def list_nft():
         app_addr,
         auth_addr,
         # Check stuff
-        Assert(offer_txn.application_id() == app_id),
-        Assert(asset_balance.value() > 0),
-        Assert(And(asset_freeze == app_addr, asset_clawback == app_addr)),
-        Assert(auth_addr.value() == Global.current_application_address()),
+        Assert(
+            And(
+                App.globalGet(app_key) == Int(0),  # We don't have anything there yet
+                offer_txn.application_id()
+                == app_id,  # The app call to trigger offered is present and same as app id
+                asset_balance.value() > Int(0),  # The caller has the asset
+                asset_freeze == app_addr,
+                asset_clawback == app_addr,  # The freeze/clawback are set to app addr
+                auth_addr.value()
+                == Global.current_application_address(),  # The authorized addr for this asset is this apps account
+            )
+        ),
         # Set appropriate parameters
-        App.globalPut("app", app_id),
-        App.globalPut("asset", asset_id),
-        App.globalPut("amount", amount),
+        App.globalPut(app_key, app_id),
+        App.globalPut(asset_key, asset_id),
+        App.globalPut(amount_key, amount),
         Int(1),
     )
 
 
-# Tmp
-transfer_selector = MethodSignature("transfer(asset,account,account,account,txn)void")
-
 buy_selector = MethodSignature("buy(asset,application,account,account,pay)void")
 
 
+@Subroutine(TealType.uint64)
 def buy_nft():
     asset_id = Txn.assets[Btoi(Txn.application_args[1])]
     app_id = Txn.applications[Btoi(Txn.application_args[2])]
@@ -62,9 +68,9 @@ def buy_nft():
         Assert(app_addr.hasValue()),
         Assert(
             And(
-                app_id == App.globalGet("app"),
-                asset_id == App.globalGet("asset"),
-                pay_txn.amount() >= App.globalGet("amount"),
+                app_id == App.globalGet(app_key),
+                asset_id == App.globalGet(asset_key),
+                pay_txn.amount() >= App.globalGet(amount_key),
                 pay_txn.receiver() == Global.current_application_address(),
             )
         ),
@@ -82,20 +88,21 @@ def buy_nft():
                 TxnField.type_enum: TxnType.ApplicationCall,
                 TxnField.application_id: app_id,
                 TxnField.application_args: [
-                    transfer_selector,
-                    Itob(Int(0)),
-                    Itob(Int(1)),
-                    Itob(Int(2)),
-                    Itob(Int(3)),
+                    MethodSignature("transfer(asset,account,account,account,txn)void"),
+                    Itob(Int(0)),  # Asset in 0th position of asset array
+                    Itob(Int(1)),  # Current owner first element here but offset by 1
+                    Itob(Int(2)),  # Buyer
+                    Itob(Int(3)),  # Who we need to pay for royalties
                 ],
                 TxnField.assets: [asset_id],
                 TxnField.accounts: [owner_acct, Txn.sender(), royalty_acct],
             }
         ),
         InnerTxnBuilder.Submit(),
-        App.globalDel("asset"),
-        App.globalDel("amount"),
-        App.globalDel("app"),
+        # Wipe listing
+        App.globalDel(asset_key),
+        App.globalDel(amount_key),
+        App.globalDel(app_key),
         Int(1),
     )
 
