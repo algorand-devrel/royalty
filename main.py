@@ -3,7 +3,6 @@ from algosdk import *
 from algosdk.v2client.algod import *
 from algosdk.future.transaction import *
 from algosdk.atomic_transaction_composer import *
-from algosdk.dryrun_results import DryrunResponse
 from algosdk.abi import *
 from sandbox import get_accounts
 from deploy import create_app, delete_app
@@ -109,16 +108,6 @@ def main():
         method_args=[created_nft_id, addr, buyer_addr, addr, ptxn],
     )
     atc.execute(client, 2)
-
-    # txns = atc.gather_signatures()
-    # dr_req = create_dryrun(client, txns)
-    # dr_resp = client.dryrun(dr_req)
-    # drr = DryrunResponse(dr_resp)
-    # for txn in drr.txns:
-    #    print(txn.app_trace(spaces=0))
-
-    # Destroy app, we're done with it
-    # delete_app(client, app_id, addr, pk)
 
 
 if __name__ == "__main__":

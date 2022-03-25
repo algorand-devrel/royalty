@@ -8,6 +8,23 @@
             "returns":{"name":"asset-id", "type":"uint64"}
         },
         {
+            "name":"offer",
+            "desc":"Flags that an asset is offered for sale and sets address authorized to submit the transfer",
+            "args":[
+                {"name":"royalty_asset", "type":"asset"}, 
+                {"name":"authorized_address", "type":"account"}
+            ],
+            "returns":{"type":"void"}
+        },
+        {
+            "name":"rescind",
+            "desc":"Rescinds offered asset",
+            "args":[
+                {"name":"royalty_asset", "type":"asset"}
+            ],
+            "returns":{"type":"void"}
+        },
+        {
             "name":"move",
             "desc":"Moves the asset passed from one account to another",
             "args":[
