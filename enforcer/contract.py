@@ -104,8 +104,8 @@ def transfer():
         Txn.sender() == auth_addr,
         # No funny business
         purchase_txn.rekey_to() == Global.zero_address(),
-        # payment txn should be from buyer
-        purchase_txn.sender() == buyer_acct,
+        # payment txn should be from auth
+        purchase_txn.sender() == auth_addr,
         # Passed the correct account according to the policy
         Or(
             And(
@@ -172,12 +172,14 @@ def offer():
 
     bal = AssetHolding.balance(Txn.sender(), asset_id)
     return Seq(
+        bal,
         # Check that caller _has_ this asset
-        Assert(bal.value() > 0),
+        Assert(bal.value() > Int(0)),
         # Check that we have a policy for it
-        Len(App.globalGet(Itob(asset_id))) > 0,
+        Assert(Len(App.globalGet(Itob(asset_id))) > Int(0)),
         # Set the auth addr for this asset
         App.localPut(Txn.sender(), Itob(asset_id), auth_acct),
+        Int(1),
     )
 
 
@@ -187,7 +189,7 @@ rescind_selector = MethodSignature("rescind(asset)void")
 @Subroutine(TealType.uint64)
 def rescind():
     asset_id = Txn.assets[Btoi(Txn.application_args[1])]
-    return App.localDel(Txn.sender(), Itob(asset_id))
+    return Seq(App.localDel(Txn.sender(), Itob(asset_id)), Int(1))
 
 
 move_selector = MethodSignature("move(asset,account,account)void")
@@ -343,6 +345,8 @@ def approval():
             set_policy(),
         ],
         [Txn.application_args[0] == transfer_selector, transfer()],
+        [Txn.application_args[0] == offer_selector, offer()],
+        [Txn.application_args[0] == rescind_selector, rescind()],
     )
 
     return Cond(

@@ -4,6 +4,7 @@ from pyteal import *
 app_key = Bytes("app")
 asset_key = Bytes("asset")
 amount_key = Bytes("amount")
+account_key = Bytes("account")
 
 list_selector = MethodSignature("list(asset,application,uint64,appl)void")
 
@@ -11,14 +12,14 @@ list_selector = MethodSignature("list(asset,application,uint64,appl)void")
 @Subroutine(TealType.uint64)
 def list_nft():
     asset_id = Txn.assets[Btoi(Txn.application_args[1])]
-    app_id = Txn.assets[Btoi(Txn.application_args[2])]
+    app_id = Txn.applications[Btoi(Txn.application_args[2])]
     amount = Btoi(Txn.application_args[3])
     offer_txn = Gtxn[Txn.group_index() - Int(1)]
     asset_balance = AssetHolding.balance(Txn.sender(), asset_id)
     asset_freeze = AssetParam.freeze(asset_id)
     asset_clawback = AssetParam.clawback(asset_id)
     app_addr = AppParam.address(app_id)
-    auth_addr = App.localGetEx(Txn.sender(), app_id, Itob(app_id))
+    auth_addr = App.localGetEx(Txn.sender(), app_id, Itob(asset_id))
 
     return Seq(
         asset_balance,
@@ -29,45 +30,47 @@ def list_nft():
         # Check stuff
         Assert(
             And(
-                App.globalGet(app_key) == Int(0),  # We don't have anything there yet
-                offer_txn.application_id()
-                == app_id,  # The app call to trigger offered is present and same as app id
-                asset_balance.value() > Int(0),  # The caller has the asset
-                asset_freeze == app_addr,
-                asset_clawback == app_addr,  # The freeze/clawback are set to app addr
-                auth_addr.value()
-                == Global.current_application_address(),  # The authorized addr for this asset is this apps account
+                # We don't have anything there yet
+                App.globalGet(app_key) == Int(0),
+                # The app call to trigger offered is present and same as app id
+                offer_txn.application_id() == app_id,
+                # The caller has the asset
+                asset_balance.value() > Int(0),
+                # The freeze/clawback are set to app addr
+                asset_freeze.value() == app_addr.value(),
+                asset_clawback.value() == app_addr.value(),
+                # The authorized addr for this asset is this apps account
+                auth_addr.value() == Global.current_application_address(),
             )
         ),
         # Set appropriate parameters
         App.globalPut(app_key, app_id),
         App.globalPut(asset_key, asset_id),
         App.globalPut(amount_key, amount),
+        App.globalPut(account_key, Txn.sender()),
         Int(1),
     )
 
 
-buy_selector = MethodSignature("buy(asset,application,account,account,pay)void")
+buy_selector = MethodSignature("buy(asset,application,account,account,account,pay)void")
 
 
 @Subroutine(TealType.uint64)
 def buy_nft():
     asset_id = Txn.assets[Btoi(Txn.application_args[1])]
     app_id = Txn.applications[Btoi(Txn.application_args[2])]
-    owner_acct = Txn.accounts[Btoi(Txn.application_args[3])]
-    royalty_acct = Txn.accounts[Btoi(Txn.application_args[4])]
+    app_addr = Txn.accounts[Btoi(Txn.application_args[3])]
+    owner_acct = Txn.accounts[Btoi(Txn.application_args[4])]
+    royalty_acct = Txn.accounts[Btoi(Txn.application_args[5])]
     pay_txn = Gtxn[Txn.group_index() - Int(1)]
-
-    app_addr = AppParam.address(app_id)
 
     # Make sure its the asset for sale
     # Make sure the payment is for the right amount
     # Issue inner app call to royalty to move asset
     return Seq(
-        app_addr,
-        Assert(app_addr.hasValue()),
         Assert(
             And(
+                owner_acct == App.globalGet(account_key),
                 app_id == App.globalGet(app_key),
                 asset_id == App.globalGet(asset_key),
                 pay_txn.amount() >= App.globalGet(amount_key),
@@ -79,7 +82,7 @@ def buy_nft():
             {
                 TxnField.type_enum: TxnType.Payment,
                 TxnField.amount: pay_txn.amount(),
-                TxnField.receiver: app_addr.value(),
+                TxnField.receiver: app_addr,
             }
         ),
         InnerTxnBuilder.Next(),
@@ -103,6 +106,7 @@ def buy_nft():
         App.globalDel(asset_key),
         App.globalDel(amount_key),
         App.globalDel(app_key),
+        App.globalDel(account_key),
         Int(1),
     )
 
