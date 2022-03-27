@@ -91,6 +91,7 @@ def main():
         addr,
         sp,
         addr_signer,
+        # method_args=[0, royalty_addr, 1000, 0, 0, 0, 0], Uncomment this to set the default policy for _all_ assets
         method_args=[created_nft_id, royalty_addr, 1000, 0, 0, 0, 0],
     )
     atc.execute(client, 2)
