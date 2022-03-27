@@ -1,3 +1,4 @@
+from re import A
 from pyteal import *
 
 
@@ -80,8 +81,13 @@ def set_policy():
     )
 
 
-transfer_selector = MethodSignature("transfer(asset,account,account,account,txn,asset)void")
+transfer_selector_with_asset = MethodSignature(
+    "transfer(asset,account,account,account,txn,asset)void"
+)
 
+transfer_selector_no_asset = MethodSignature(
+    "transfer(asset,account,account,account,txn)void"
+)
 
 @Subroutine(TealType.uint64)
 def transfer():
@@ -93,13 +99,18 @@ def transfer():
 
     policy = App.globalGet(Itob(asset_id))
 
+    # Get the auth_addr from local state of the owner
+    # If its not present, a 0 is returned and the call fails when we try
+    # to compare to the bytes of Txn.sender
+    auth_addr = App.localGet(owner_acct, Itob(asset_id))
+
     valid_transfer_group = And(
-        # App call signed by current owner
-        Txn.sender() == owner_acct,
+        # App call sent by authorizing address
+        Txn.sender() == auth_addr,
         # No funny business
         purchase_txn.rekey_to() == Global.zero_address(),
-        # payment txn should be from buyer
-        purchase_txn.sender() == buyer_acct,
+        # payment txn should be from auth
+        purchase_txn.sender() == auth_addr,
         # Passed the correct account according to the policy
         Or(
             And(
@@ -126,8 +137,8 @@ def transfer():
     buyer_auth = AccountParam.authAddr(buyer_acct)
 
     return Seq(
-        owner_auth,
-        buyer_auth,
+        owner_auth,  # initialize value
+        buyer_auth,  # initialize value
         #  Make sure we have address(32 bytes) and royalty amount(8 bytes)
         #  may have additional allowed assets
         Assert(Len(policy) >= Int(40)),
@@ -150,8 +161,40 @@ def transfer():
         ),
         # Perform asset move
         move_asset(asset_id, owner_acct, buyer_acct),
+        # Clear listing from local state of owner
+        App.localDel(owner_acct, Itob(asset_id)),
         Int(1),
     )
+
+
+offer_selector = MethodSignature("offer(asset,account)void")
+
+
+@Subroutine(TealType.uint64)
+def offer():
+    asset_id = Txn.assets[Btoi(Txn.application_args[1])]
+    auth_acct = Txn.accounts[Btoi(Txn.application_args[2])]
+
+    bal = AssetHolding.balance(Txn.sender(), asset_id)
+    return Seq(
+        bal,
+        # Check that caller _has_ this asset
+        Assert(bal.value() > Int(0)),
+        # Check that we have a policy for it
+        Assert(Len(App.globalGet(Itob(asset_id))) > Int(0)),
+        # Set the auth addr for this asset
+        App.localPut(Txn.sender(), Itob(asset_id), auth_acct),
+        Int(1),
+    )
+
+
+rescind_selector = MethodSignature("rescind(asset)void")
+
+
+@Subroutine(TealType.uint64)
+def rescind():
+    asset_id = Txn.assets[Btoi(Txn.application_args[1])]
+    return Seq(App.localDel(Txn.sender(), Itob(asset_id)), Int(1))
 
 
 move_selector = MethodSignature("move(asset,account,account)void")
@@ -162,7 +205,14 @@ def move():
     asset_id = Txn.assets[Btoi(Txn.application_args[1])]
     from_acct = Txn.accounts[Btoi(Txn.application_args[2])]
     to_acct = Txn.accounts[Btoi(Txn.application_args[3])]
-    return Seq(move_asset(asset_id, from_acct, to_acct), Int(1))
+
+    opted_in = App.optedIn(from_acct, Int(0))
+
+    return Seq(
+        If(opted_in, App.localDel(from_acct, Itob(asset_id))),
+        move_asset(asset_id, from_acct, to_acct),
+        Int(1),
+    )
 
 
 @Subroutine(TealType.none)
@@ -299,15 +349,17 @@ def approval():
             And(Txn.application_args[0] == set_policy_selector, from_creator),
             set_policy(),
         ],
-        [Txn.application_args[0] == transfer_selector, transfer()],
+        [Or(Txn.application_args[0] == transfer_selector_with_asset, Txn.application_args[0] == transfer_selector_no_asset), transfer()],
+        [Txn.application_args[0] == offer_selector, offer()],
+        [Txn.application_args[0] == rescind_selector, rescind()],
     )
 
     return Cond(
         [Txn.application_id() == Int(0), Approve()],
         [Txn.on_completion() == OnComplete.DeleteApplication, Return(from_creator)],
         [Txn.on_completion() == OnComplete.UpdateApplication, Return(from_creator)],
-        [Txn.on_completion() == OnComplete.OptIn, Reject()],
-        [Txn.on_completion() == OnComplete.CloseOut, Reject()],
+        [Txn.on_completion() == OnComplete.OptIn, Approve()],
+        [Txn.on_completion() == OnComplete.CloseOut, Approve()],
         [Txn.on_completion() == OnComplete.NoOp, Return(action_router)],
     )
 

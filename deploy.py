@@ -4,7 +4,13 @@ from algosdk.future.transaction import *
 
 
 def create_asa(
-    client: algod.AlgodClient, addr: str, pk: str, name: str, unit_name: str, total: int, decimals: int
+    client: algod.AlgodClient,
+    addr: str,
+    pk: str,
+    name: str,
+    unit_name: str,
+    total: int,
+    decimals: int,
 ) -> int:
     # Get suggested params from network
     sp = client.suggested_params()
@@ -33,7 +39,13 @@ def create_asa(
 
 
 def create_app(
-    client: algod.AlgodClient, addr: str, pk: str, get_approval, get_clear
+    client: algod.AlgodClient,
+    addr: str,
+    pk: str,
+    get_approval,
+    get_clear,
+    global_schema,
+    local_schema,
 ) -> int:
     # Get suggested params from network
     sp = client.suggested_params()
@@ -45,9 +57,6 @@ def create_app(
     # Read in clear teal source && compile
     clear_result = client.compile(get_clear())
     clear_bytes = base64.b64decode(clear_result["result"])
-
-    global_schema = StateSchema(0, 64)
-    local_schema = StateSchema(0, 0)
 
     # Create the transaction
     create_txn = ApplicationCreateTxn(
@@ -68,8 +77,15 @@ def create_app(
 
     # Wait for the result so we can return the app id
     result = wait_for_confirmation(client, txid, 4)
+    app_id = result["application-index"]
+    app_addr = logic.get_application_address(app_id)
 
-    return result["application-index"]
+    # Make sure the app address is funded with at least min balance
+    ptxn = PaymentTxn(addr, sp, app_addr, int(1e6))
+    txid = client.send_transaction(ptxn.sign(pk))
+    wait_for_confirmation(client, txid, 4)
+
+    return app_id, app_addr
 
 
 def update_app(

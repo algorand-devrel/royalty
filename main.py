@@ -3,19 +3,26 @@ from algosdk import *
 from algosdk.v2client.algod import *
 from algosdk.future.transaction import *
 from algosdk.atomic_transaction_composer import *
-#from algosdk.dryrun_results import DryrunResponse
 from algosdk.abi import *
 from sandbox import get_accounts
-from deploy import create_asa, create_app, delete_app
-from contract import get_approval, get_clear
+from deploy import create_app, create_asa, delete_app
+
+import enforcer.contract as enforcer
+import marketplace.contract as marketplace
+
 
 client = AlgodClient("a" * 64, "http://localhost:4001")
 
-# Read in ABI description
-with open("royalty.json") as f:
-    iface = Interface.from_json(f.read())
+# Read in ABI description from enforcer
+with open("enforcer/abi.json") as f:
+    enforcer_iface = Interface.from_json(f.read())
+
+# Read in ABI description from market
+with open("marketplace/abi.json") as f:
+    marketplace_iface = Interface.from_json(f.read())
 
 
+# Utility method til one is provided
 def get_method(i: Interface, name: str) -> Method:
     for m in i.methods:
         if m.name == name:
@@ -26,38 +33,31 @@ def get_method(i: Interface, name: str) -> Method:
 def main():
     # Get accounts
     accts = get_accounts()
-    addr, pk = accts[0]
 
+    addr, pk = accts[0]
+    royalty_addr, _ = accts[1]
     buyer_addr, buyer_pk = accts[2]
 
     addr_signer = AccountTransactionSigner(pk)
     buyer_signer = AccountTransactionSigner(buyer_pk)
 
-    # Create FakeUSD
-    asset_id = create_asa(client, addr, pk, "FakeUSD", "FUSD", 1_000_000_000_000, 6)
-    print("Created ASA: {}".format(asset_id))
-
-    # Buyer OptIn and Receiver FUSD
-    sp = client.suggested_params()
-    atc = AtomicTransactionComposer()
-    atc.add_transaction(
-        TransactionWithSigner(
-            txn=AssetOptInTxn(buyer_addr, sp, asset_id), signer=buyer_signer
-        )
+    #
+    # Create Royalty Enforcer application
+    #
+    app_id, app_addr = create_app(
+        client,
+        addr,
+        pk,
+        enforcer.get_approval,
+        enforcer.get_clear,
+        global_schema=StateSchema(0, 64),
+        local_schema=StateSchema(0, 16),
     )
-    atc.add_transaction(
-        TransactionWithSigner(
-            txn=AssetTransferTxn(addr, sp, buyer_addr, 100_000_000_000, asset_id), signer=addr_signer
-        )
-    )
-    atc.execute(client, 2)
 
-    # Create application
-    app_id = create_app(client, addr, pk, get_approval, get_clear)
-    app_addr = logic.get_application_address(app_id)
-    print("Created app: {} ({})".format(app_id, app_addr))
-
+    #
     # Create NFT
+    #
+
     sp = client.suggested_params()
     atc = AtomicTransactionComposer()
     atc.add_transaction(
@@ -65,13 +65,41 @@ def main():
             txn=PaymentTxn(addr, sp, app_addr, int(1e8)), signer=addr_signer
         )
     )
-    atc.add_method_call(app_id, get_method(iface, "create_nft"), addr, sp, addr_signer)
+    atc.add_transaction(
+        TransactionWithSigner(
+            txn=ApplicationCallTxn(addr, sp, app_id, OnComplete.OptInOC),
+            signer=addr_signer,
+        )
+    )
+    atc.add_method_call(
+        app_id, get_method(enforcer_iface, "create_nft"), addr, sp, addr_signer
+    )
     results = atc.execute(client, 2)
 
     created_nft_id = results.abi_results[0].return_value
     print("Created nft {}".format(created_nft_id))
 
-    print("Calling move method")
+    #
+    # Set the royalty policy
+    #
+
+    print("Calling set_policy method")
+    atc = AtomicTransactionComposer()
+    atc.add_method_call(
+        app_id,
+        get_method(enforcer_iface, "set_policy"),
+        addr,
+        sp,
+        addr_signer,
+        method_args=[created_nft_id, royalty_addr, 1000, 0, 0, 0, 0],
+    )
+    atc.execute(client, 2)
+
+    #
+    # Move NFT to app creator
+    #
+
+    print("Calling move method to give asa to app creator")
     sp = client.suggested_params()
     atc = AtomicTransactionComposer()
     atc.add_transaction(
@@ -81,7 +109,7 @@ def main():
     )
     atc.add_method_call(
         app_id,
-        get_method(iface, "move"),
+        get_method(enforcer_iface, "move"),
         addr,
         sp,
         addr_signer,
@@ -89,110 +117,81 @@ def main():
     )
     atc.execute(client, 2)
 
-    print("Calling set_policy method (Algo)")
-    # Set the royalty policy
+    #
+    # Create Marketplace Application
+    #
+
+    print("Creating marketplace app")
+    market_app_id, market_app_addr = create_app(
+        client,
+        addr,
+        pk,
+        marketplace.get_approval,
+        marketplace.get_clear,
+        global_schema=StateSchema(3, 1),
+        local_schema=StateSchema(0, 16),
+    )
+    print("Created marketplace app: {} ({})".format(market_app_id, market_app_addr))
+
+    #
+    # List NFT for sale on marketplace
+    #
+
+    selling_amount = int(1e7)
+
+    print("Calling list method on marketplace")
+
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
-        get_method(iface, "set_policy"),
+        get_method(enforcer_iface, "offer"),
         addr,
         sp,
         addr_signer,
-        method_args=[created_nft_id, addr, 1000, 0, 0, 0, 0],
+        [created_nft_id, market_app_addr],
+    )
+    grp = atc.build_group()
+
+    atc = AtomicTransactionComposer()
+    atc.add_method_call(
+        market_app_id,
+        get_method(marketplace_iface, "list"),
+        addr,
+        sp,
+        addr_signer,
+        [created_nft_id, app_id, selling_amount, grp[0]],
     )
     atc.execute(client, 2)
+    print("Listed asset for sale")
 
-    print("Calling transfer")
+    #
+    # Buyer calls buy method
+    #
 
-    # Perform a transfer using the application
+    print("Calling buy method on marketplace")
     atc = AtomicTransactionComposer()
-    # First opt buyer into asset
-    atc.add_transaction(
-        TransactionWithSigner(
-            txn=AssetTransferTxn(buyer_addr, sp, buyer_addr, 0, created_nft_id),
-            signer=buyer_signer,
-        )
-    )
-    # Payment Transaction to cover purchase of NFT
-    ptxn = TransactionWithSigner(
-        txn=PaymentTxn(buyer_addr, sp, app_addr, int(1e10)),
+    txn = TransactionWithSigner(
+        txn=PaymentTxn(buyer_addr, sp, market_app_addr, selling_amount),
         signer=buyer_signer,
     )
-    # Actual transfer method call
-    atc.add_method_call(
-        app_id,
-        get_method(iface, "transfer"),
-        addr,
-        sp,
-        addr_signer,
-        method_args=[created_nft_id, addr, buyer_addr, addr, ptxn, 0],
-    )
-    atc.execute(client, 2)
-
-    # Reset owner of NFT for ASA demo.
-
-    print("Calling move method")
-    sp = client.suggested_params()
-    atc = AtomicTransactionComposer()
-    atc.add_method_call(
-        app_id,
-        get_method(iface, "move"),
-        addr,
-        sp,
-        addr_signer,
-        [created_nft_id, buyer_addr, addr],
-    )
-    atc.execute(client, 2)
-
-    print("Calling set_policy method (FakeUSD)")
-    # Set the royalty policy
-    atc = AtomicTransactionComposer()
-    atc.add_method_call(
-        app_id,
-        get_method(iface, "set_policy"),
-        addr,
-        sp,
-        addr_signer,
-        method_args=[created_nft_id, addr, 1000, asset_id, 0, 0, 0],
-    )
-    atc.execute(client, 2)
-
-    print("Calling transfer")
-
-    # Perform a transfer using the application
-    atc = AtomicTransactionComposer()
-    # First opt buyer into asset
     atc.add_transaction(
         TransactionWithSigner(
-            txn=AssetTransferTxn(buyer_addr, sp, buyer_addr, 0, created_nft_id),
-            signer=buyer_signer,
+            txn=AssetOptInTxn(buyer_addr, sp, created_nft_id), signer=buyer_signer
         )
     )
-    # Payment Transaction to cover purchase of NFT
-    ptxn = TransactionWithSigner(
-        txn=AssetTransferTxn(buyer_addr, sp, app_addr, int(1e10), asset_id),
-        signer=buyer_signer,
-    )
-    # Actual transfer method call
     atc.add_method_call(
-        app_id,
-        get_method(iface, "transfer"),
-        addr,
+        market_app_id,
+        get_method(marketplace_iface, "buy"),
+        buyer_addr,
         sp,
-        addr_signer,
-        method_args=[created_nft_id, addr, buyer_addr, addr, ptxn, asset_id],
+        buyer_signer,
+        [created_nft_id, app_id, app_addr, addr, royalty_addr, txn],
     )
+
     atc.execute(client, 2)
+    print("Bought ASA")
 
-    # txns = atc.gather_signatures()
-    # dr_req = create_dryrun(client, txns)
-    # dr_resp = client.dryrun(dr_req)
-    # drr = DryrunResponse(dr_resp)
-    # for txn in drr.txns:
-    #    print(txn.app_trace(spaces=0))
-
-    # Destroy app, we're done with it
-    # delete_app(client, app_id, addr, pk)
+    # Balances should all match up
 
 
 if __name__ == "__main__":

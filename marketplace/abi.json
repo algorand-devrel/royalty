@@ -1,0 +1,29 @@
+{
+    "name":"demo-arc18-enforcer-marketplace",
+    "methods":[
+        {
+            "name":"list",
+            "desc":"Lists an asset for sale",
+            "args":[
+                {"name":"royalty_asset", "type":"asset"}, 
+                {"name":"royalty_application", "type":"application"},
+                {"name":"amount", "type":"uint64"},
+                {"name":"offer_txn", "type":"appl"}
+            ],
+            "returns":{"type":"void"}
+        },
+        {
+            "name":"buy",
+            "desc":"Allows caller to purchase asset with algos",
+            "args":[
+                {"name":"royalty_asset", "type":"asset"},
+                {"name":"royalty_enforcer", "type":"application"},
+                {"name":"royalty_enforcer_account", "type":"account"},
+                {"name":"current_owner", "type":"account"},
+                {"name":"royalty_account", "type":"account"},
+                {"name":"payment", "type":"pay"}
+            ],
+            "returns":{"type":"void"}
+        }
+    ]
+}

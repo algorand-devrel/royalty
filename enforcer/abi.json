@@ -1,11 +1,28 @@
 {
-    "name":"arc-1337",
+    "name":"demo-arc-18",
     "methods":[
         {
             "name":"create_nft",
             "desc":"Create an nft with appropriate parameters, return its id",
             "args":[],
-            "returns":{"name":"asset-id", "type":"uint64"}
+            "returns":{"name":"asset_id", "type":"uint64"}
+        },
+        {
+            "name":"offer",
+            "desc":"Flags that an asset is offered for sale and sets address authorized to submit the transfer",
+            "args":[
+                {"name":"royalty_asset", "type":"asset"}, 
+                {"name":"authorized_address", "type":"account"}
+            ],
+            "returns":{"type":"void"}
+        },
+        {
+            "name":"rescind",
+            "desc":"Rescinds offered asset",
+            "args":[
+                {"name":"royalty_asset", "type":"asset"}
+            ],
+            "returns":{"type":"void"}
         },
         {
             "name":"move",
@@ -38,8 +55,8 @@
                 {"name":"royalty_asset", "type":"asset"}, 
                 {"name":"owner_acct", "type":"account"},
                 {"name":"buyer_acct", "type":"account"},
-                {"name":"royalty_acct", "type":"account"},
-                {"name":"payment_txn", "type":"txn"},
+                {"name":"royalty_receiver", "type":"account"},
+                {"name":"payment", "type":"txn"},
                 {"name":"payment_asset", "type":"asset"}
             ],
             "returns":{"type":"void"}
