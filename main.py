@@ -33,16 +33,18 @@ def get_method(i: Interface, name: str) -> Method:
 def main():
     # Get accounts
     accts = get_accounts()
-    addr, pk = accts[0]
 
+    addr, pk = accts[0]
     royalty_addr, _ = accts[1]
     buyer_addr, buyer_pk = accts[2]
 
     addr_signer = AccountTransactionSigner(pk)
     buyer_signer = AccountTransactionSigner(buyer_pk)
 
+    #
     # Create Royalty Enforcer application
-    app_id = create_app(
+    #
+    app_id, app_addr = create_app(
         client,
         addr,
         pk,
@@ -51,10 +53,12 @@ def main():
         global_schema=StateSchema(0, 64),
         local_schema=StateSchema(0, 16),
     )
-    app_addr = logic.get_application_address(app_id)
     print("Created app: {} ({})".format(app_id, app_addr))
 
+    #
     # Create NFT
+    #
+
     sp = client.suggested_params()
     atc = AtomicTransactionComposer()
     atc.add_transaction(
@@ -76,8 +80,11 @@ def main():
     created_nft_id = results.abi_results[0].return_value
     print("Created nft {}".format(created_nft_id))
 
-    print("Calling set_policy method")
+    #
     # Set the royalty policy
+    #
+
+    print("Calling set_policy method")
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
@@ -88,6 +95,10 @@ def main():
         method_args=[created_nft_id, royalty_addr, 1000, 0, 0, 0, 0],
     )
     atc.execute(client, 2)
+
+    #
+    # Move NFT to app creator
+    #
 
     print("Calling move method to give asa to app creator")
     sp = client.suggested_params()
@@ -107,8 +118,12 @@ def main():
     )
     atc.execute(client, 2)
 
+    #
+    # Create Marketplace Application
+    #
+
     print("Creating marketplace app")
-    market_app_id = create_app(
+    market_app_id, market_app_addr = create_app(
         client,
         addr,
         pk,
@@ -117,13 +132,16 @@ def main():
         global_schema=StateSchema(3, 1),
         local_schema=StateSchema(0, 16),
     )
-    market_app_addr = logic.get_application_address(market_app_id)
-
     print("Created marketplace app: {} ({})".format(market_app_id, market_app_addr))
 
-    selling_amount = int(1e5)
+    #
+    # List NFT for sale on marketplace
+    #
+
+    selling_amount = int(1e7)
 
     print("Calling list method on marketplace")
+
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
@@ -145,8 +163,11 @@ def main():
         [created_nft_id, app_id, selling_amount, grp[0]],
     )
     atc.execute(client, 2)
-
     print("Listed asset for sale")
+
+    #
+    # Buyer calls buy method
+    #
 
     print("Calling buy method on marketplace")
     atc = AtomicTransactionComposer()
@@ -170,6 +191,8 @@ def main():
 
     atc.execute(client, 2)
     print("Bought ASA")
+
+    # Balances should all match up
 
 
 if __name__ == "__main__":

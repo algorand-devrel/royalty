@@ -5,7 +5,7 @@
             "name":"create_nft",
             "desc":"Create an nft with appropriate parameters, return its id",
             "args":[],
-            "returns":{"name":"asset-id", "type":"uint64"}
+            "returns":{"name":"asset_id", "type":"uint64"}
         },
         {
             "name":"offer",
@@ -55,8 +55,8 @@
                 {"name":"royalty_asset", "type":"asset"}, 
                 {"name":"owner_acct", "type":"account"},
                 {"name":"buyer_acct", "type":"account"},
-                {"name":"royalty_acct", "type":"account"},
-                {"name":"payment_txn", "type":"txn"}
+                {"name":"royalty_receiver", "type":"account"},
+                {"name":"payment", "type":"txn"}
             ],
             "returns":{"type":"void"}
         }

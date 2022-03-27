@@ -43,15 +43,14 @@ def create_app(
     # Wait for the result so we can return the app id
     result = wait_for_confirmation(client, txid, 4)
     app_id = result["application-index"]
-
     app_addr = logic.get_application_address(app_id)
 
+    # Make sure the app address is funded with at least min balance
     ptxn = PaymentTxn(addr, sp, app_addr, int(1e6))
     txid = client.send_transaction(ptxn.sign(pk))
-    # Wait for the result so we can return the app id
     wait_for_confirmation(client, txid, 4)
 
-    return app_id
+    return app_id, app_addr
 
 
 def update_app(
