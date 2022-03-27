@@ -56,7 +56,8 @@
                 {"name":"owner_acct", "type":"account"},
                 {"name":"buyer_acct", "type":"account"},
                 {"name":"royalty_receiver", "type":"account"},
-                {"name":"payment", "type":"txn"}
+                {"name":"payment", "type":"txn"},
+                {"name":"payment_asset", "type":"asset"}
             ],
             "returns":{"type":"void"}
         }

@@ -5,7 +5,7 @@ from algosdk.future.transaction import *
 from algosdk.atomic_transaction_composer import *
 from algosdk.abi import *
 from sandbox import get_accounts
-from deploy import create_app, delete_app
+from deploy import create_app, create_asa, delete_app
 
 import enforcer.contract as enforcer
 import marketplace.contract as marketplace
@@ -53,7 +53,6 @@ def main():
         global_schema=StateSchema(0, 64),
         local_schema=StateSchema(0, 16),
     )
-    print("Created app: {} ({})".format(app_id, app_addr))
 
     #
     # Create NFT

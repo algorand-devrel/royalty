@@ -81,8 +81,13 @@ def set_policy():
     )
 
 
-transfer_selector = MethodSignature("transfer(asset,account,account,account,txn)void")
+transfer_selector_with_asset = MethodSignature(
+    "transfer(asset,account,account,account,txn,asset)void"
+)
 
+transfer_selector_no_asset = MethodSignature(
+    "transfer(asset,account,account,account,txn)void"
+)
 
 @Subroutine(TealType.uint64)
 def transfer():
@@ -344,7 +349,7 @@ def approval():
             And(Txn.application_args[0] == set_policy_selector, from_creator),
             set_policy(),
         ],
-        [Txn.application_args[0] == transfer_selector, transfer()],
+        [Or(Txn.application_args[0] == transfer_selector_with_asset, Txn.application_args[0] == transfer_selector_no_asset), transfer()],
         [Txn.application_args[0] == offer_selector, offer()],
         [Txn.application_args[0] == rescind_selector, rescind()],
     )
