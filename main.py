@@ -53,6 +53,7 @@ def main():
         global_schema=StateSchema(0, 64),
         local_schema=StateSchema(0, 16),
     )
+    print("Created royalty-enforcment app {} ({})".format(app_id, app_addr))
 
     #
     # Create NFT
@@ -91,8 +92,15 @@ def main():
         addr,
         sp,
         addr_signer,
-        # method_args=[0, royalty_addr, 1000, 0, 0, 0, 0], Uncomment this to set the default policy for _all_ assets
         method_args=[created_nft_id, royalty_addr, 1000, 0, 0, 0, 0],
+    )
+    atc.add_method_call(
+        app_id,
+        get_method(enforcer_iface, "set_policy"),
+        addr,
+        sp,
+        addr_signer,
+        method_args=[0, royalty_addr, 5000, 0, 0, 0, 0],
     )
     atc.execute(client, 2)
 

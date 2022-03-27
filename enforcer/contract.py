@@ -49,11 +49,7 @@ def set_policy():
     # TODO: this opts in any assets we need to but we arentopting out of assets from any previous policy
 
     # If the ID passed is 0, apply this policy as default for any transfers
-    royalty_asset = If(
-        Btoi(Txn.application_args[1]) == Int(0),
-        Int(0),
-        Txn.assets[Btoi(Txn.application_args[1])],
-    )
+    royalty_asset = Txn.assets[Btoi(Txn.application_args[1])]
     recv = Txn.application_args[2]
     share = Txn.application_args[3]
 
