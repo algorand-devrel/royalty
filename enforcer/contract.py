@@ -89,6 +89,7 @@ transfer_selector_no_asset = MethodSignature(
     "transfer(asset,account,account,account,txn)void"
 )
 
+
 @Subroutine(TealType.uint64)
 def transfer():
     asset_id = Txn.assets[Btoi(Txn.application_args[1])]
@@ -349,7 +350,13 @@ def approval():
             And(Txn.application_args[0] == set_policy_selector, from_creator),
             set_policy(),
         ],
-        [Or(Txn.application_args[0] == transfer_selector_with_asset, Txn.application_args[0] == transfer_selector_no_asset), transfer()],
+        [
+            Or(
+                Txn.application_args[0] == transfer_selector_with_asset,
+                Txn.application_args[0] == transfer_selector_no_asset,
+            ),
+            transfer(),
+        ],
         [Txn.application_args[0] == offer_selector, offer()],
         [Txn.application_args[0] == rescind_selector, rescind()],
     )
