@@ -46,10 +46,14 @@ set_policy_selector = MethodSignature(
 
 @Subroutine(TealType.uint64)
 def set_policy():
-    # TODO: this opts in any assets we need to but we arent opting out of assets from any
-    # previous policy
+    # TODO: this opts in any assets we need to but we arentopting out of assets from any previous policy
 
-    royalty_asset = Txn.assets[Btoi(Txn.application_args[1])]
+    # If the ID passed is 0, apply this policy as default for any transfers
+    royalty_asset = If(
+        Btoi(Txn.application_args[1]) == Int(0),
+        Int(0),
+        Txn.assets[Btoi(Txn.application_args[1])],
+    )
     recv = Txn.application_args[2]
     share = Txn.application_args[3]
 
@@ -57,9 +61,9 @@ def set_policy():
     curr_asset = ScratchVar(TealType.uint64)
 
     return Seq(
-        Assert(Btoi(share) < Int(basis_point_multiplier)),  # cant be > 10k
+        Assert(Btoi(share) < Int(basis_point_multiplier)),  # cant be > 10k or 100%
         buff.store(Bytes("")),
-        ensure_opted_in(royalty_asset),
+        If(royalty_asset != Int(0), ensure_opted_in(royalty_asset)),
         For(
             (i := ScratchVar()).store(Int(4)),
             i.load() < Txn.application_args.length(),
@@ -98,7 +102,7 @@ def transfer():
     royalty_acct = Txn.accounts[Btoi(Txn.application_args[4])]
     purchase_txn = Gtxn[Txn.group_index() - Int(1)]
 
-    policy = App.globalGet(Itob(asset_id))
+    policy = ScratchVar(TealType.bytes)
 
     # Get the auth_addr from local state of the owner
     # If its not present, a 0 is returned and the call fails when we try
@@ -119,7 +123,7 @@ def transfer():
                 # Just to be sure
                 purchase_txn.asset_close_to() == Global.zero_address(),
                 # Is this a valid asset id according to the spec?
-                in_approved_list(purchase_txn.xfer_asset(), policy),
+                in_approved_list(purchase_txn.xfer_asset(), policy.load()),
                 # Make sure payments go to the right participants
                 purchase_txn.asset_receiver() == Global.current_application_address(),
             ),
@@ -131,18 +135,17 @@ def transfer():
                 purchase_txn.receiver() == Global.current_application_address(),
             ),
         ),
-        correct_royalty_receiver(royalty_acct, policy),
+        correct_royalty_receiver(royalty_acct, policy.load()),
     )
 
-    owner_auth = AccountParam.authAddr(owner_acct)
-    buyer_auth = AccountParam.authAddr(buyer_acct)
-
     return Seq(
-        owner_auth,  # initialize value
-        buyer_auth,  # initialize value
+        # initialize values
+        (owner_auth := AccountParam.authAddr(owner_acct)),
+        (buyer_auth := AccountParam.authAddr(buyer_acct)),
+        policy.store(get_policy(asset_id)),
         #  Make sure we have address(32 bytes) and royalty amount(8 bytes)
         #  may have additional allowed assets
-        Assert(Len(policy) >= Int(40)),
+        Assert(Len(policy.load()) >= Int(40)),
         # Make sure transactions look right
         Assert(valid_transfer_group),
         # Make sure neither owner/buyer have been rekeyed
@@ -156,9 +159,9 @@ def transfer():
                 purchase_txn.asset_amount(),
                 owner_acct,
                 royalty_acct,
-                policy,
+                policy.load(),
             ),
-            pay_algos(purchase_txn.amount(), owner_acct, royalty_acct, policy),
+            pay_algos(purchase_txn.amount(), owner_acct, royalty_acct, policy.load()),
         ),
         # Perform asset move
         move_asset(asset_id, owner_acct, buyer_acct),
@@ -182,7 +185,7 @@ def offer():
         # Check that caller _has_ this asset
         Assert(bal.value() > Int(0)),
         # Check that we have a policy for it
-        Assert(Len(App.globalGet(Itob(asset_id))) > Int(0)),
+        Assert(Len(get_policy(asset_id)) > Int(0)),
         # Set the auth addr for this asset
         App.localPut(Txn.sender(), Itob(asset_id), auth_acct),
         Int(1),
@@ -337,6 +340,18 @@ def move_asset(asset_id, owner, buyer):
             }
         ),
         InnerTxnBuilder.Submit(),
+    )
+
+
+@Subroutine(TealType.bytes)
+def get_policy(asset_id):
+    # Returns a policy for the specific asset or the default policy if one is set
+    default_policy = App.globalGetEx(Int(0), Itob(Int(0)))
+    specific_policy = App.globalGetEx(Int(0), Itob(asset_id))
+    return Seq(
+        specific_policy,
+        default_policy,
+        If(specific_policy.hasValue(), specific_policy.value(), default_policy.value()),
     )
 
 
