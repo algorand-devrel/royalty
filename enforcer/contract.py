@@ -81,12 +81,8 @@ def set_policy():
     )
 
 
-transfer_selector_with_asset = MethodSignature(
-    "transfer(asset,account,account,account,txn,asset)void"
-)
-
-transfer_selector_no_asset = MethodSignature(
-    "transfer(asset,account,account,account,txn)void"
+transfer_selector = MethodSignature(
+    "transfer(asset,account,account,account,uint64,txn,asset)void"
 )
 
 
@@ -96,22 +92,30 @@ def transfer():
     owner_acct = Txn.accounts[Btoi(Txn.application_args[2])]
     buyer_acct = Txn.accounts[Btoi(Txn.application_args[3])]
     royalty_acct = Txn.accounts[Btoi(Txn.application_args[4])]
+    asset_amt = Btoi(Txn.application_args[5])
     purchase_txn = Gtxn[Txn.group_index() - Int(1)]
+    # dont need to use this, just rely on the asset id of the asset payment txn
+    # asset_idx = Txn.application_args[6]
 
     policy = ScratchVar(TealType.bytes)
 
     # Get the auth_addr from local state of the owner
     # If its not present, a 0 is returned and the call fails when we try
     # to compare to the bytes of Txn.sender
-    auth_addr = App.localGet(owner_acct, Itob(asset_id))
+    offer = App.localGet(owner_acct, Itob(asset_id))
+    offer_auth_addr = Extract(offer, Int(0), Int(32))
+    offer_amt = ExtractUint64(offer, Int(32))
 
     valid_transfer_group = And(
+        Global.group_size() == Int(2),
         # App call sent by authorizing address
-        Txn.sender() == auth_addr,
+        Txn.sender() == offer_auth_addr,
         # No funny business
         purchase_txn.rekey_to() == Global.zero_address(),
         # payment txn should be from auth
-        purchase_txn.sender() == auth_addr,
+        purchase_txn.sender() == offer_auth_addr,
+        # transfer amount <= offered amount
+        asset_amt <= offer_amt,
         # Passed the correct account according to the policy
         Or(
             And(
@@ -160,30 +164,32 @@ def transfer():
             pay_algos(purchase_txn.amount(), owner_acct, royalty_acct, policy.load()),
         ),
         # Perform asset move
-        move_asset(asset_id, owner_acct, buyer_acct),
+        move_asset(asset_id, owner_acct, buyer_acct, asset_amt),
         # Clear listing from local state of owner
-        App.localDel(owner_acct, Itob(asset_id)),
+        update_offered(
+            owner_acct, Itob(asset_id), offer_auth_addr, offer_amt - asset_amt
+        ),
         Int(1),
     )
 
 
-offer_selector = MethodSignature("offer(asset,account)void")
+offer_selector = MethodSignature("offer(asset,uint64,account)void")
 
 
 @Subroutine(TealType.uint64)
 def offer():
     asset_id = Txn.assets[Btoi(Txn.application_args[1])]
-    auth_acct = Txn.accounts[Btoi(Txn.application_args[2])]
+    asset_amt = Btoi(Txn.application_args[2])
+    auth_acct = Txn.accounts[Btoi(Txn.application_args[3])]
 
-    bal = AssetHolding.balance(Txn.sender(), asset_id)
     return Seq(
-        bal,
+        bal := AssetHolding.balance(Txn.sender(), asset_id),
         # Check that caller _has_ this asset
-        Assert(bal.value() > Int(0)),
+        Assert(bal.value() >= asset_amt),
         # Check that we have a policy for it
         Assert(Len(get_policy(asset_id)) > Int(0)),
         # Set the auth addr for this asset
-        App.localPut(Txn.sender(), Itob(asset_id), auth_acct),
+        update_offered(Txn.sender(), Itob(asset_id), auth_acct, asset_amt),
         Int(1),
     )
 
@@ -194,23 +200,31 @@ rescind_selector = MethodSignature("rescind(asset)void")
 @Subroutine(TealType.uint64)
 def rescind():
     asset_id = Txn.assets[Btoi(Txn.application_args[1])]
-    return Seq(App.localDel(Txn.sender(), Itob(asset_id)), Int(1))
+    return Seq(
+        # Wipe out any offer if it exists
+        update_offered(Txn.sender(), Itob(asset_id), Bytes(""), Int(0)),
+        Int(1),
+    )
 
 
-move_selector = MethodSignature("move(asset,account,account)void")
+move_selector = MethodSignature("move(asset,uint64,account,account)void")
 
 
 @Subroutine(TealType.uint64)
 def move():
     asset_id = Txn.assets[Btoi(Txn.application_args[1])]
-    from_acct = Txn.accounts[Btoi(Txn.application_args[2])]
-    to_acct = Txn.accounts[Btoi(Txn.application_args[3])]
+    asset_amt = Btoi(Txn.application_args[2])
+    from_acct = Txn.accounts[Btoi(Txn.application_args[3])]
+    to_acct = Txn.accounts[Btoi(Txn.application_args[4])]
 
     opted_in = App.optedIn(from_acct, Int(0))
 
     return Seq(
-        If(opted_in, App.localDel(from_acct, Itob(asset_id))),
-        move_asset(asset_id, from_acct, to_acct),
+        # Delete any offer if it exists
+        If(opted_in, update_offered(from_acct, Itob(asset_id), Bytes(""), Int(0))),
+        # Move it
+        move_asset(asset_id, from_acct, to_acct, asset_amt),
+        # Success!
         Int(1),
     )
 
@@ -323,19 +337,29 @@ def in_approved_list(asset_id, policy):
 
 
 @Subroutine(TealType.none)
-def move_asset(asset_id, owner, buyer):
+def move_asset(asset_id, owner, buyer, asset_amt):
+    # TODO: should we check that this should be a close_to?
     return Seq(
         InnerTxnBuilder.Begin(),
         InnerTxnBuilder.SetFields(
             {
                 TxnField.type_enum: TxnType.AssetTransfer,
                 TxnField.xfer_asset: asset_id,
-                TxnField.asset_amount: Int(1),
+                TxnField.asset_amount: asset_amt,
                 TxnField.asset_sender: owner,
                 TxnField.asset_receiver: buyer,
             }
         ),
         InnerTxnBuilder.Submit(),
+    )
+
+
+@Subroutine(TealType.none)
+def update_offered(acct, asset, auth, amt):
+    return If(
+        amt > Int(0),
+        App.localPut(acct, asset, Concat(auth, Itob(amt))),
+        App.localDel(acct, asset),
     )
 
 
@@ -347,6 +371,7 @@ def get_policy(asset_id):
     return Seq(
         specific_policy,
         default_policy,
+        Assert(Or(specific_policy.hasValue(), default_policy.hasValue())),
         If(specific_policy.hasValue(), specific_policy.value(), default_policy.value()),
     )
 
@@ -361,13 +386,7 @@ def approval():
             And(Txn.application_args[0] == set_policy_selector, from_creator),
             set_policy(),
         ],
-        [
-            Or(
-                Txn.application_args[0] == transfer_selector_with_asset,
-                Txn.application_args[0] == transfer_selector_no_asset,
-            ),
-            transfer(),
-        ],
+        [Txn.application_args[0] == transfer_selector, transfer()],
         [Txn.application_args[0] == offer_selector, offer()],
         [Txn.application_args[0] == rescind_selector, rescind()],
     )

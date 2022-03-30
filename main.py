@@ -1,3 +1,4 @@
+from pickletools import StackObject
 from webbrowser import get
 from algosdk import *
 from algosdk.v2client.algod import *
@@ -28,6 +29,15 @@ def get_method(i: Interface, name: str) -> Method:
         if m.name == name:
             return m
     raise Exception("No method with the name {}".format(name))
+
+
+def dryrun(atc: AtomicTransactionComposer, client: AlgodClient):
+    dr_req = create_dryrun(client, atc.gather_signatures())
+    dr_resp = client.dryrun(dr_req)
+    dr_result = dryrun_results.DryrunResponse(dr_resp)
+    for txn in dr_result.txns:
+        if txn.app_call_rejected():
+            print(txn.app_trace(dryrun_results.StackPrinterConfig(max_value_width=0)))
 
 
 def main():
@@ -109,6 +119,7 @@ def main():
     #
 
     print("Calling move method to give asa to app creator")
+    move_amount = 1
     sp = client.suggested_params()
     atc = AtomicTransactionComposer()
     atc.add_transaction(
@@ -122,7 +133,7 @@ def main():
         addr,
         sp,
         addr_signer,
-        [created_nft_id, app_addr, addr],
+        [created_nft_id, move_amount, app_addr, addr],
     )
     atc.execute(client, 2)
 
@@ -137,7 +148,7 @@ def main():
         pk,
         marketplace.get_approval,
         marketplace.get_clear,
-        global_schema=StateSchema(3, 1),
+        global_schema=StateSchema(4, 1),
         local_schema=StateSchema(0, 16),
     )
     print("Created marketplace app: {} ({})".format(market_app_id, market_app_addr))
@@ -146,10 +157,13 @@ def main():
     # List NFT for sale on marketplace
     #
 
-    selling_amount = int(1e7)
+    price = int(1e7)
+    offered_amount = 1
 
     print("Calling list method on marketplace")
 
+    # We construct an ATC with no intention of submitting it as is
+    # we're just using it to parse/marshal in the app args
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
@@ -157,10 +171,11 @@ def main():
         addr,
         sp,
         addr_signer,
-        [created_nft_id, market_app_addr],
+        [created_nft_id, offered_amount, market_app_addr],
     )
     grp = atc.build_group()
 
+    # Construct the list app call, passing the offer app call built previously
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         market_app_id,
@@ -168,8 +183,12 @@ def main():
         addr,
         sp,
         addr_signer,
-        [created_nft_id, app_id, selling_amount, grp[0]],
+        [created_nft_id, app_id, offered_amount, price, grp[0]],
     )
+
+    # dryrun(atc, client)
+    # return
+
     atc.execute(client, 2)
     print("Listed asset for sale")
 
@@ -180,7 +199,7 @@ def main():
     print("Calling buy method on marketplace")
     atc = AtomicTransactionComposer()
     txn = TransactionWithSigner(
-        txn=PaymentTxn(buyer_addr, sp, market_app_addr, selling_amount),
+        txn=PaymentTxn(buyer_addr, sp, market_app_addr, price),
         signer=buyer_signer,
     )
     atc.add_transaction(
@@ -194,7 +213,7 @@ def main():
         buyer_addr,
         sp,
         buyer_signer,
-        [created_nft_id, app_id, app_addr, addr, royalty_addr, txn],
+        [created_nft_id, app_id, app_addr, addr, royalty_addr, offered_amount, txn],
     )
 
     atc.execute(client, 2)

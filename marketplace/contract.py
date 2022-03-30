@@ -3,30 +3,27 @@ from pyteal import *
 
 app_key = Bytes("app")
 asset_key = Bytes("asset")
+price_key = Bytes("price")
 amount_key = Bytes("amount")
 account_key = Bytes("account")
 
-list_selector = MethodSignature("list(asset,application,uint64,appl)void")
+list_selector = MethodSignature("list(asset,application,uint64,uint64,appl)void")
 
 
 @Subroutine(TealType.uint64)
 def list_nft():
     asset_id = Txn.assets[Btoi(Txn.application_args[1])]
     app_id = Txn.applications[Btoi(Txn.application_args[2])]
-    amount = Btoi(Txn.application_args[3])
+    asset_amount = Btoi(Txn.application_args[3])
+    price = Btoi(Txn.application_args[4])
     offer_txn = Gtxn[Txn.group_index() - Int(1)]
-    asset_balance = AssetHolding.balance(Txn.sender(), asset_id)
-    asset_freeze = AssetParam.freeze(asset_id)
-    asset_clawback = AssetParam.clawback(asset_id)
-    app_addr = AppParam.address(app_id)
-    auth_addr = App.localGetEx(Txn.sender(), app_id, Itob(asset_id))
 
     return Seq(
-        asset_balance,
-        asset_freeze,
-        asset_clawback,
-        app_addr,
-        auth_addr,
+        asset_balance := AssetHolding.balance(Txn.sender(), asset_id),
+        asset_freeze := AssetParam.freeze(asset_id),
+        asset_clawback := AssetParam.clawback(asset_id),
+        app_addr := AppParam.address(app_id),
+        offered := App.localGetEx(Txn.sender(), app_id, Itob(asset_id)),
         # Check stuff
         Assert(
             And(
@@ -40,19 +37,24 @@ def list_nft():
                 asset_freeze.value() == app_addr.value(),
                 asset_clawback.value() == app_addr.value(),
                 # The authorized addr for this asset is this apps account
-                auth_addr.value() == Global.current_application_address(),
+                Extract(offered.value(), Int(0), Int(32))
+                == Global.current_application_address(),
+                ExtractUint64(offered.value(), Int(32)) <= asset_amount,
             )
         ),
         # Set appropriate parameters
         App.globalPut(app_key, app_id),
         App.globalPut(asset_key, asset_id),
-        App.globalPut(amount_key, amount),
+        App.globalPut(amount_key, asset_amount),
+        App.globalPut(price_key, price),
         App.globalPut(account_key, Txn.sender()),
         Int(1),
     )
 
 
-buy_selector = MethodSignature("buy(asset,application,account,account,account,pay)void")
+buy_selector = MethodSignature(
+    "buy(asset,application,account,account,account,uint64,pay)void"
+)
 
 
 @Subroutine(TealType.uint64)
@@ -62,6 +64,7 @@ def buy_nft():
     app_addr = Txn.accounts[Btoi(Txn.application_args[3])]
     owner_acct = Txn.accounts[Btoi(Txn.application_args[4])]
     royalty_acct = Txn.accounts[Btoi(Txn.application_args[5])]
+    asset_amount = Btoi(Txn.application_args[6])
     pay_txn = Gtxn[Txn.group_index() - Int(1)]
 
     # Make sure its the asset for sale
@@ -70,10 +73,13 @@ def buy_nft():
     return Seq(
         Assert(
             And(
+                # Matches what we have in global state
                 owner_acct == App.globalGet(account_key),
                 app_id == App.globalGet(app_key),
                 asset_id == App.globalGet(asset_key),
-                pay_txn.amount() >= App.globalGet(amount_key),
+                pay_txn.amount() >= App.globalGet(price_key),
+                asset_amount <= App.globalGet(amount_key),
+                # Pay me plz
                 pay_txn.receiver() == Global.current_application_address(),
             )
         ),
@@ -91,11 +97,15 @@ def buy_nft():
                 TxnField.type_enum: TxnType.ApplicationCall,
                 TxnField.application_id: app_id,
                 TxnField.application_args: [
-                    MethodSignature("transfer(asset,account,account,account,txn)void"),
-                    Itob(Int(0)),  # Asset in 0th position of asset array
+                    MethodSignature(
+                        "transfer(asset,account,account,account,uint64,txn,asset)void"
+                    ),
+                    Itob(Int(0)),  # Royalty Asset in 0th position of asset array
                     Itob(Int(1)),  # Current owner first element here but offset by 1
                     Itob(Int(2)),  # Buyer
                     Itob(Int(3)),  # Who we need to pay for royalties
+                    Itob(asset_amount),  # The number of units being purchased
+                    # Itob(Int(0))   # Asset idx of 0
                 ],
                 TxnField.assets: [asset_id],
                 TxnField.accounts: [owner_acct, Txn.sender(), royalty_acct],
@@ -107,6 +117,7 @@ def buy_nft():
         App.globalDel(amount_key),
         App.globalDel(app_key),
         App.globalDel(account_key),
+        App.globalDel(price_key),
         Int(1),
     )
 

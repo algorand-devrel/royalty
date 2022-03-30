@@ -7,7 +7,8 @@
             "args":[
                 {"name":"royalty_asset", "type":"asset"}, 
                 {"name":"royalty_application", "type":"application"},
-                {"name":"amount", "type":"uint64"},
+                {"name":"royalty_asset_amount", "type":"uint64"},
+                {"name":"price", "type":"uint64"},
                 {"name":"offer_txn", "type":"appl"}
             ],
             "returns":{"type":"void"}
@@ -21,6 +22,7 @@
                 {"name":"royalty_enforcer_account", "type":"account"},
                 {"name":"current_owner", "type":"account"},
                 {"name":"royalty_account", "type":"account"},
+                {"name":"royalty_asset_amount", "type":"uint64"},
                 {"name":"payment", "type":"pay"}
             ],
             "returns":{"type":"void"}

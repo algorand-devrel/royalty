@@ -12,6 +12,7 @@
             "desc":"Flags that an asset is offered for sale and sets address authorized to submit the transfer",
             "args":[
                 {"name":"royalty_asset", "type":"asset"}, 
+                {"name":"royalty_asset_amount", "type":"uint64"}, 
                 {"name":"authorized_address", "type":"account"}
             ],
             "returns":{"type":"void"}
@@ -29,6 +30,7 @@
             "desc":"Moves the asset passed from one account to another",
             "args":[
                 {"name":"royalty_asset", "type":"asset"}, 
+                {"name":"royalty_asset_amount", "type":"uint64"}, 
                 {"name":"from", "type":"account"},
                 {"name":"to", "type":"account"}
             ],
@@ -56,6 +58,7 @@
                 {"name":"owner_acct", "type":"account"},
                 {"name":"buyer_acct", "type":"account"},
                 {"name":"royalty_receiver", "type":"account"},
+                {"name":"royalty_asset_amount", "type":"uint64"},
                 {"name":"payment", "type":"txn"},
                 {"name":"payment_asset", "type":"asset"}
             ],
