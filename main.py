@@ -14,6 +14,8 @@ import marketplace.contract as marketplace
 
 client = AlgodClient("a" * 64, "http://localhost:4001")
 
+ZERO_ADDR = encoding.encode_address(bytes(32))
+
 # Read in ABI description from enforcer
 with open("enforcer/abi.json") as f:
     enforcer_iface = Interface.from_json(f.read())
@@ -122,18 +124,20 @@ def main():
     move_amount = 1
     sp = client.suggested_params()
     atc = AtomicTransactionComposer()
+    # Opt in
     atc.add_transaction(
         TransactionWithSigner(
             txn=AssetTransferTxn(addr, sp, addr, 0, created_nft_id), signer=addr_signer
         )
     )
+    # Move
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "move"),
+        get_method(enforcer_iface, "royalty_free_move"),
         addr,
         sp,
         addr_signer,
-        [created_nft_id, move_amount, app_addr, addr],
+        [created_nft_id, move_amount, app_addr, addr, 0, ZERO_ADDR],
     )
     atc.execute(client, 2)
 
@@ -171,7 +175,7 @@ def main():
         addr,
         sp,
         addr_signer,
-        [created_nft_id, offered_amount, market_app_addr],
+        [created_nft_id, offered_amount, market_app_addr, 0, ZERO_ADDR],
     )
     grp = atc.build_group()
 

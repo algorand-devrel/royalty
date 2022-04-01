@@ -71,6 +71,7 @@ def buy_nft():
     # Make sure the payment is for the right amount
     # Issue inner app call to royalty to move asset
     return Seq(
+        current_offer := App.localGetEx(owner_acct, app_id, Itob(asset_id)),
         Assert(
             And(
                 # Matches what we have in global state
@@ -81,6 +82,7 @@ def buy_nft():
                 asset_amount <= App.globalGet(amount_key),
                 # Pay me plz
                 pay_txn.receiver() == Global.current_application_address(),
+                current_offer.hasValue(),
             )
         ),
         InnerTxnBuilder.Begin(),
@@ -98,14 +100,17 @@ def buy_nft():
                 TxnField.application_id: app_id,
                 TxnField.application_args: [
                     MethodSignature(
-                        "transfer(asset,account,account,account,uint64,txn,asset)void"
+                        "transfer(asset,account,account,account,uint64,txn,asset,uint64)void"
                     ),
                     Itob(Int(0)),  # Royalty Asset in 0th position of asset array
                     Itob(Int(1)),  # Current owner first element here but offset by 1
                     Itob(Int(2)),  # Buyer
                     Itob(Int(3)),  # Who we need to pay for royalties
                     Itob(asset_amount),  # The number of units being purchased
-                    # Itob(Int(0))   # Asset idx of 0
+                    Itob(Int(0)),  # Asset idx of 0, should be ignored
+                    Itob(
+                        offered_amount(current_offer.value())
+                    ),  # Current offered amount
                 ],
                 TxnField.assets: [asset_id],
                 TxnField.accounts: [owner_acct, Txn.sender(), royalty_acct],
@@ -120,6 +125,16 @@ def buy_nft():
         App.globalDel(price_key),
         Int(1),
     )
+
+
+@Subroutine(TealType.uint64)
+def offered_amount(offer):
+    return ExtractUint64(offer, Int(32))
+
+
+@Subroutine(TealType.bytes)
+def offered_auth(offer):
+    return Extract(offer, Int(0), Int(32))
 
 
 def approval():

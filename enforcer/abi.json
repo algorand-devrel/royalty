@@ -1,68 +1,186 @@
 {
-    "name":"demo-arc-18",
-    "methods":[
+    "name": "demo-arc-18",
+    "methods": [
         {
-            "name":"create_nft",
-            "desc":"Create an nft with appropriate parameters, return its id",
-            "args":[],
-            "returns":{"name":"asset_id", "type":"uint64"}
+            "name": "create_nft",
+            "desc": "Create an nft with appropriate parameters, return its id",
+            "args": [],
+            "returns": {
+                "name": "asset_id",
+                "type": "uint64"
+            }
         },
         {
-            "name":"offer",
-            "desc":"Flags that an asset is offered for sale and sets address authorized to submit the transfer",
-            "args":[
-                {"name":"royalty_asset", "type":"asset"}, 
-                {"name":"royalty_asset_amount", "type":"uint64"}, 
-                {"name":"authorized_address", "type":"account"}
+            "name": "set_policy",
+            "desc": "Sets the royalty policy for a given app id",
+            "args": [
+                {
+                    "name": "royalty_asset",
+                    "type": "asset"
+                },
+                {
+                    "name": "royalty_receiver",
+                    "type": "address"
+                },
+                {
+                    "name": "royalty_share",
+                    "type": "uint64"
+                },
+                {
+                    "name": "allowed_asset_1",
+                    "type": "asset"
+                },
+                {
+                    "name": "allowed_asset_2",
+                    "type": "asset"
+                },
+                {
+                    "name": "allowed_asset_3",
+                    "type": "asset"
+                },
+                {
+                    "name": "allowed_asset_4",
+                    "type": "asset"
+                }
             ],
-            "returns":{"type":"void"}
+            "returns": {
+                "type": "void"
+            }
         },
         {
-            "name":"rescind",
-            "desc":"Rescinds offered asset",
-            "args":[
-                {"name":"royalty_asset", "type":"asset"}
+            "name": "offer",
+            "desc": "Flags that an asset is offered for sale and sets address authorized to submit the transfer",
+            "args": [
+                {
+                    "name": "royalty_asset",
+                    "type": "asset"
+                },
+                {
+                    "name": "royalty_asset_amount",
+                    "type": "uint64"
+                },
+                {
+                    "name": "authorized_address",
+                    "type": "account"
+                },
+                {
+                    "name": "curr_offered_amount",
+                    "type": "uint64"
+                },
+                {
+                    "name": "curr_offered_auth",
+                    "type": "address"
+                }
             ],
-            "returns":{"type":"void"}
+            "returns": {
+                "type": "void"
+            }
         },
         {
-            "name":"move",
-            "desc":"Moves the asset passed from one account to another",
-            "args":[
-                {"name":"royalty_asset", "type":"asset"}, 
-                {"name":"royalty_asset_amount", "type":"uint64"}, 
-                {"name":"from", "type":"account"},
-                {"name":"to", "type":"account"}
+            "name": "transfer",
+            "desc": "Transfers an Asset from one account to another and enforces royalty payments",
+            "args": [
+                {
+                    "name": "royalty_asset",
+                    "type": "asset"
+                },
+                {
+                    "name": "owner_acct",
+                    "type": "account"
+                },
+                {
+                    "name": "buyer_acct",
+                    "type": "account"
+                },
+                {
+                    "name": "royalty_receiver",
+                    "type": "account"
+                },
+                {
+                    "name": "royalty_asset_amount",
+                    "type": "uint64"
+                },
+                {
+                    "name": "payment",
+                    "type": "txn"
+                },
+                {
+                    "name": "payment_asset",
+                    "type": "asset"
+                },
+                {
+                    "name": "curr_offered_amount",
+                    "type": "uint64"
+                }
             ],
-            "returns":{"type":"void"}
+            "returns": {
+                "type": "void"
+            }
         },
         {
-            "name":"set_policy",
-            "desc":"Sets the royalty policy for a given app id",
-            "args":[
-                {"name":"royalty_asset", "type":"asset"}, 
-                {"name":"royalty_receiver", "type":"address"},
-                {"name":"royalty_share", "type":"uint64"},
-                {"name":"allowed_asset_1", "type":"asset"},
-                {"name":"allowed_asset_2", "type":"asset"},
-                {"name":"allowed_asset_3", "type":"asset"},
-                {"name":"allowed_asset_4", "type":"asset"}
+            "name": "royalty_free_move",
+            "desc": "Moves the asset passed from one account to another",
+            "args": [
+                {
+                    "name": "royalty_asset",
+                    "type": "asset"
+                },
+                {
+                    "name": "royalty_asset_amount",
+                    "type": "uint64"
+                },
+                {
+                    "name": "from",
+                    "type": "account"
+                },
+                {
+                    "name": "to",
+                    "type": "account"
+                },
+                {
+                    "name": "curr_offered_amount",
+                    "type": "uint64"
+                },
+                {
+                    "name": "curr_offered_auth",
+                    "type": "address"
+                }
             ],
-            "returns":{"type":"void"}
+            "returns": {
+                "type": "void"
+            }
         },
         {
-            "name":"transfer",
-            "desc":"Transfers an Asset from one account to another and enforces royalty payments",
-            "args":[
-                {"name":"royalty_asset", "type":"asset"}, 
-                {"name":"owner_acct", "type":"account"},
-                {"name":"buyer_acct", "type":"account"},
-                {"name":"royalty_receiver", "type":"account"},
-                {"name":"royalty_asset_amount", "type":"uint64"},
-                {"name":"payment", "type":"txn"},
-                {"name":"payment_asset", "type":"asset"}
+            "name": "get_policy",
+            "desc": "Gets the royalty policy for a given asset id",
+            "readonly": true,
+            "args": [
+                {
+                    "name": "royalty_asset",
+                    "type": "uint64"
+                }
             ],
-            "returns":{"type":"void"}
+            "returns": {
+                "type": "(address,uint64,uint64,uint64,uint64,uint64)"
+            }
+        },
+        {
+            "name": "get_offer",
+            "desc": "Gets the details offered asset",
+            "readonly": true,
+            "args": [
+                {
+                    "name": "royalty_asset",
+                    "type": "uint64"
+                },
+                {
+                    "name": "from",
+                    "type": "uint64"
+                }
+            ],
+            "returns": {
+                "type": "(address,uint64)"
+            }
         }
     ]
 }
