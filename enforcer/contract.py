@@ -55,7 +55,11 @@ def set_policy():
     buff = ScratchVar(TealType.bytes)
     curr_asset = ScratchVar(TealType.uint64)
 
+    current_policy = App.globalGetEx(Int(0), Itob(royalty_asset))
+
     return Seq(
+        current_policy,
+        Assert(Not(current_policy.hasValue())),
         Assert(Btoi(share) < Int(basis_point_multiplier)),  # cant be > 10k or 100%
         buff.store(Bytes("")),
         If(royalty_asset != Int(0), ensure_opted_in(royalty_asset)),
