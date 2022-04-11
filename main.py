@@ -53,9 +53,10 @@ def main():
     addr_signer = AccountTransactionSigner(pk)
     buyer_signer = AccountTransactionSigner(buyer_pk)
 
-    #
+    #################
     # Create Royalty Enforcer application
-    #
+    #################
+
     app_id, app_addr = create_app(
         client,
         addr,
@@ -67,9 +68,9 @@ def main():
     )
     print("Created royalty-enforcment app {} ({})".format(app_id, app_addr))
 
-    #
+    #################
     # Create NFT
-    #
+    #################
 
     sp = client.suggested_params()
     atc = AtomicTransactionComposer()
@@ -92,9 +93,9 @@ def main():
     created_nft_id = results.abi_results[0].return_value
     print("Created nft {}".format(created_nft_id))
 
-    #
+    #################
     # Set the royalty policy
-    #
+    #################
 
     print("Calling set_royalty_policy method")
     atc = AtomicTransactionComposer()
@@ -108,9 +109,28 @@ def main():
     )
     atc.execute(client, 2)
 
-    #
+
+    #################
+    # Get policy from global state of app 
+    #################
+
+    app_info = client.application_info(app_id)
+    state = app_info['params']['global-state']
+    policy = {}
+    for sv in state:
+        k = base64.b64decode(sv['key']).decode('utf8')
+        type = sv['value']['type']
+        val = sv['value']['uint']
+        if type == 1:
+            val = encoding.encode_address(base64.b64decode(sv['value']['bytes']))
+        policy[k] = val
+
+    print("Policy:  {}".format(policy))
+
+
+    #################
     # Move NFT to app creator
-    #
+    #################
 
     print("Calling move method to give asa to app creator")
     move_amount = 1
@@ -133,9 +153,9 @@ def main():
     )
     atc.execute(client, 2)
 
-    #
+    #################
     # Create Marketplace Application
-    #
+    #################
 
     print("Creating marketplace app")
     market_app_id, market_app_addr = create_app(
@@ -149,9 +169,9 @@ def main():
     )
     print("Created marketplace app: {} ({})".format(market_app_id, market_app_addr))
 
-    #
+    #################
     # List NFT for sale on marketplace
-    #
+    #################
 
     price = int(2e6)
     offered_amount = 1
@@ -181,16 +201,12 @@ def main():
         addr_signer,
         [created_nft_id, app_id, offered_amount, price, grp[0]],
     )
-
-    # dryrun(atc, client)
-    # return
-
     atc.execute(client, 2)
     print("Listed asset for sale")
 
-    #
+    #################
     # Buyer calls buy method
-    #
+    #################
 
     print("Calling buy method on marketplace")
     atc = AtomicTransactionComposer()
@@ -211,13 +227,11 @@ def main():
         buyer_signer,
         [created_nft_id, app_id, app_addr, addr, royalty_addr, offered_amount, txn],
     )
-
-    #dryrun(atc, client)
-    #return
     atc.execute(client, 2)
     print("Bought ASA")
 
     # Balances should all match up
+
 
 
 if __name__ == "__main__":
