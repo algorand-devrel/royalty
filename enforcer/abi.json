@@ -11,41 +11,34 @@
             }
         },
         {
-            "name": "set_policy",
-            "desc": "Sets the royalty policy for a given app id",
+            "name": "set_royalty_policy",
+            "desc": "Sets the royalty basis for a given app id",
             "args": [
                 {
-                    "name": "royalty_asset",
-                    "type": "asset"
-                },
-                {
-                    "name": "royalty_receiver",
-                    "type": "address"
-                },
-                {
-                    "name": "royalty_share",
+                    "name": "royalty_basis",
                     "type": "uint64"
                 },
                 {
-                    "name": "allowed_asset_1",
-                    "type": "asset"
-                },
-                {
-                    "name": "allowed_asset_2",
-                    "type": "asset"
-                },
-                {
-                    "name": "allowed_asset_3",
-                    "type": "asset"
-                },
-                {
-                    "name": "allowed_asset_4",
-                    "type": "asset"
+                    "name": "royalty_receiver",
+                    "type": "account"
                 }
             ],
-            "returns": {
-                "type": "void"
-            }
+            "returns": {"type":"void"}
+        },
+        {
+            "name": "set_payment_asset",
+            "desc": "Triggers the contract account to opt in or out of an asset that should be used for payment of royalties",
+            "args": [
+                {
+                    "name": "payment_asset",
+                    "type": "asset"
+                },
+                {
+                    "name": "allowed",
+                    "type": "bool"
+                }
+            ],
+            "returns": {"type":"void"}
         },
         {
             "name": "offer",
@@ -64,11 +57,11 @@
                     "type": "account"
                 },
                 {
-                    "name": "curr_offered_amount",
+                    "name": "current_offered_amount",
                     "type": "uint64"
                 },
                 {
-                    "name": "curr_offered_auth",
+                    "name": "current_offered_auth",
                     "type": "address"
                 }
             ],
@@ -85,11 +78,11 @@
                     "type": "asset"
                 },
                 {
-                    "name": "owner_acct",
+                    "name": "from",
                     "type": "account"
                 },
                 {
-                    "name": "buyer_acct",
+                    "name": "to",
                     "type": "account"
                 },
                 {
@@ -109,7 +102,7 @@
                     "type": "asset"
                 },
                 {
-                    "name": "curr_offered_amount",
+                    "name": "current_offered_amount",
                     "type": "uint64"
                 }
             ],
@@ -138,30 +131,16 @@
                     "type": "account"
                 },
                 {
-                    "name": "curr_offered_amount",
+                    "name": "current_offered_amount",
                     "type": "uint64"
                 },
                 {
-                    "name": "curr_offered_auth",
+                    "name": "current_offered_auth",
                     "type": "address"
                 }
             ],
             "returns": {
                 "type": "void"
-            }
-        },
-        {
-            "name": "get_policy",
-            "desc": "Gets the royalty policy for a given asset id",
-            "readonly": true,
-            "args": [
-                {
-                    "name": "royalty_asset",
-                    "type": "uint64"
-                }
-            ],
-            "returns": {
-                "type": "(address,uint64,uint64,uint64,uint64,uint64)"
             }
         },
         {

@@ -62,7 +62,7 @@ def main():
         pk,
         enforcer.get_approval,
         enforcer.get_clear,
-        global_schema=StateSchema(0, 64),
+        global_schema=StateSchema(1, 1),
         local_schema=StateSchema(0, 16),
     )
     print("Created royalty-enforcment app {} ({})".format(app_id, app_addr))
@@ -96,23 +96,15 @@ def main():
     # Set the royalty policy
     #
 
-    print("Calling set_policy method")
+    print("Calling set_royalty_policy method")
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "set_policy"),
+        get_method(enforcer_iface, "set_royalty_policy"),
         addr,
         sp,
         addr_signer,
-        method_args=[created_nft_id, royalty_addr, 1000, 0, 0, 0, 0],
-    )
-    atc.add_method_call(
-        app_id,
-        get_method(enforcer_iface, "set_policy"),
-        addr,
-        sp,
-        addr_signer,
-        method_args=[0, royalty_addr, 5000, 0, 0, 0, 0],
+        method_args=[1000, royalty_addr],
     )
     atc.execute(client, 2)
 
@@ -161,7 +153,7 @@ def main():
     # List NFT for sale on marketplace
     #
 
-    price = int(1e7)
+    price = int(2e6)
     offered_amount = 1
 
     print("Calling list method on marketplace")
@@ -220,6 +212,8 @@ def main():
         [created_nft_id, app_id, app_addr, addr, royalty_addr, offered_amount, txn],
     )
 
+    #dryrun(atc, client)
+    #return
     atc.execute(client, 2)
     print("Bought ASA")
 

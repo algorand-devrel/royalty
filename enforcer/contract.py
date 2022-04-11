@@ -61,19 +61,13 @@ set_policy_selector = MethodSignature("set_royalty_policy(uint64,account)void")
 @Subroutine(TealType.uint64)
 def set_policy():
     r_basis = Btoi(Txn.application_args[1])
-    r_recv = Txn.application_args[2]
+    r_recv = Txn.accounts[Btoi(Txn.application_args[2])]
     return Seq(
         (r_basis_stored := App.globalGetEx(Int(0), r_basis_key)),
         (r_recv_stored := App.globalGetEx(Int(0), r_recv_key)),
-        Assert(
-            Not(r_basis_stored.hasValue())
-        ),  # OPTIONAL: implementer may choose not to reject here
-        Assert(
-            Not(r_recv_stored.hasValue())
-        ),  # OPTIONAL: implementer may choose not to reject here
-        Assert(
-            r_basis <= Int(basis_point_multiplier)
-        ),  # MUST be <= 10k basis points (100%)
+        Assert(Not(r_basis_stored.hasValue())), 
+        Assert(Not(r_recv_stored.hasValue())), 
+        Assert(r_basis <= Int(basis_point_multiplier)), 
         App.globalPut(r_basis_key, r_basis),
         App.globalPut(r_recv_key, r_recv),
         Int(1),
@@ -141,8 +135,8 @@ def transfer():
     royalty_acct = Txn.accounts[Btoi(Txn.application_args[4])]
     asset_amt = Btoi(Txn.application_args[5])
     purchase_txn = Gtxn[Txn.group_index() - Int(1)]
-    # dont need to use this, just rely on the asset id of the asset payment txn
-    # asset_idx     = Txn.application_args[6]
+    # Unusued, just passed in args to let the app have access in foreign assets 
+    # asset_idx  = Txn.application_args[6]
     curr_offered_amt = Btoi(Txn.application_args[7])
 
     # Get the auth_addr from local state of the owner
@@ -182,7 +176,7 @@ def transfer():
                 purchase_txn.receiver() == Global.current_application_address(),
             ),
         ),
-        royalty_acct == stored_royalty_recv.load(),
+        royalty_acct ==  stored_royalty_recv.load(),
     )
 
     return Seq(
