@@ -65,9 +65,9 @@ def set_policy():
     return Seq(
         (r_basis_stored := App.globalGetEx(Int(0), r_basis_key)),
         (r_recv_stored := App.globalGetEx(Int(0), r_recv_key)),
-        Assert(Not(r_basis_stored.hasValue())), 
-        Assert(Not(r_recv_stored.hasValue())), 
-        Assert(r_basis <= Int(basis_point_multiplier)), 
+        Assert(Not(r_basis_stored.hasValue())),
+        Assert(Not(r_recv_stored.hasValue())),
+        Assert(r_basis <= Int(basis_point_multiplier)),
         App.globalPut(r_basis_key, r_basis),
         App.globalPut(r_recv_key, r_recv),
         Int(1),
@@ -135,7 +135,7 @@ def transfer():
     royalty_acct = Txn.accounts[Btoi(Txn.application_args[4])]
     asset_amt = Btoi(Txn.application_args[5])
     purchase_txn = Gtxn[Txn.group_index() - Int(1)]
-    # Unusued, just passed in args to let the app have access in foreign assets 
+    # Unusued, just passed in args to let the app have access in foreign assets
     # asset_idx  = Txn.application_args[6]
     curr_offered_amt = Btoi(Txn.application_args[7])
 
@@ -176,7 +176,7 @@ def transfer():
                 purchase_txn.receiver() == Global.current_application_address(),
             ),
         ),
-        royalty_acct ==  stored_royalty_recv.load(),
+        royalty_acct == stored_royalty_recv.load(),
     )
 
     return Seq(

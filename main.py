@@ -1,4 +1,5 @@
 from pickletools import StackObject
+from threading import local
 from webbrowser import get
 from algosdk import *
 from algosdk.v2client.algod import *
@@ -109,24 +110,22 @@ def main():
     )
     atc.execute(client, 2)
 
-
     #################
-    # Get policy from global state of app 
+    # Get policy from global state of app
     #################
 
     app_info = client.application_info(app_id)
-    state = app_info['params']['global-state']
+    state = app_info["params"]["global-state"]
     policy = {}
     for sv in state:
-        k = base64.b64decode(sv['key']).decode('utf8')
-        type = sv['value']['type']
-        val = sv['value']['uint']
+        k = base64.b64decode(sv["key"]).decode("utf8")
+        type = sv["value"]["type"]
+        val = sv["value"]["uint"]
         if type == 1:
-            val = encoding.encode_address(base64.b64decode(sv['value']['bytes']))
+            val = encoding.encode_address(base64.b64decode(sv["value"]["bytes"]))
         policy[k] = val
 
     print("Policy:  {}".format(policy))
-
 
     #################
     # Move NFT to app creator
@@ -205,6 +204,22 @@ def main():
     print("Listed asset for sale")
 
     #################
+    # Get offered details
+    #################
+
+    aai = client.account_application_info(addr, app_id)
+    local_state = aai["app-local-state"]["key-value"]
+    for lsv in local_state:
+        aid = int.from_bytes(base64.b64decode(lsv["key"]), "big")
+        offer = base64.b64decode(lsv["value"]["bytes"])
+        auth = encoding.encode_address(offer[:32])
+        amt = int.from_bytes(offer[32:], "big")
+        print("Offer from {}".format(addr))
+        print("\tASA id: {}".format(aid))
+        print("\tAuth addr: {}".format(auth))
+        print("\tAmount: {}".format(amt))
+
+    #################
     # Buyer calls buy method
     #################
 
@@ -231,7 +246,6 @@ def main():
     print("Bought ASA")
 
     # Balances should all match up
-
 
 
 if __name__ == "__main__":
