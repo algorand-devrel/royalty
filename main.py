@@ -42,9 +42,11 @@ def dryrun(atc: AtomicTransactionComposer, client: AlgodClient):
         if txn.app_call_rejected():
             print(txn.app_trace(dryrun_results.StackPrinterConfig(max_value_width=0)))
 
+
 def get_algo_balance(addr: str):
     ai = client.account_info(addr)
-    return ai['amount']
+    return ai["amount"]
+
 
 def main():
     # Get accounts
@@ -60,8 +62,6 @@ def main():
 
     addr_signer = AccountTransactionSigner(pk)
     buyer_signer = AccountTransactionSigner(buyer_pk)
-
-
 
     #################
     # Create Royalty Enforcer application
@@ -125,16 +125,14 @@ def main():
 
     app_info = client.application_info(app_id)
     state = app_info["params"]["global-state"]
-    policy = {}
+    print("Policy for app id: {}".format(app_id))
     for sv in state:
         k = base64.b64decode(sv["key"]).decode("utf8")
         type = sv["value"]["type"]
         val = sv["value"]["uint"]
         if type == 1:
             val = encoding.encode_address(base64.b64decode(sv["value"]["bytes"]))
-        policy[k] = val
-
-    print("Policy:  {}".format(policy))
+        print("\t{}: {}".format(k, val))
 
     #################
     # Move NFT to app creator
@@ -160,7 +158,6 @@ def main():
     )
     atc.execute(client, 2)
 
-
     #################
     # Create Marketplace Application
     #################
@@ -178,17 +175,16 @@ def main():
     print("Created marketplace app: {} ({})".format(market_app_id, market_app_addr))
 
     #################
-    # List NFT for sale on marketplace
+    # Get balances after contract setup and before list/sale
     #################
 
     owner_balance = get_algo_balance(addr)
     buyer_balance = get_algo_balance(buyer_addr)
     royalty_receiver_balance = get_algo_balance(royalty_addr)
 
-    print("Owner Balance Before: {}".format(owner_balance))
-    print("Royalty Receiver Balance Before: {}".format(royalty_receiver_balance))
-    print("Buyer Balance Before: {}".format(buyer_balance))
-
+    #################
+    # List NFT for sale on marketplace
+    #################
 
     print("Calling list method on marketplace")
 
@@ -264,9 +260,14 @@ def main():
     new_buyer_balance = get_algo_balance(buyer_addr)
     new_royalty_receiver_balance = get_algo_balance(royalty_addr)
 
+    print()
     # Balances should all match up
     print("Owner Balance Delta: {}".format(new_owner_balance - owner_balance))
-    print("Royalty Receiver Balance Delta: {}".format(new_royalty_receiver_balance - royalty_receiver_balance))
+    print(
+        "Royalty Receiver Balance Delta: {}".format(
+            new_royalty_receiver_balance - royalty_receiver_balance
+        )
+    )
     print("Buyer Balance Delta: {}".format(new_buyer_balance - buyer_balance))
 
 
