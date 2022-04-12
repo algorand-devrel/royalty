@@ -42,10 +42,17 @@ def dryrun(atc: AtomicTransactionComposer, client: AlgodClient):
         if txn.app_call_rejected():
             print(txn.app_trace(dryrun_results.StackPrinterConfig(max_value_width=0)))
 
+def get_algo_balance(addr: str):
+    ai = client.account_info(addr)
+    return ai['amount']
 
 def main():
     # Get accounts
     accts = get_accounts()
+
+    move_amount = 1
+    offered_amount = 1
+    price = int(2e6)
 
     addr, pk = accts[0]
     royalty_addr, _ = accts[1]
@@ -53,6 +60,8 @@ def main():
 
     addr_signer = AccountTransactionSigner(pk)
     buyer_signer = AccountTransactionSigner(buyer_pk)
+
+
 
     #################
     # Create Royalty Enforcer application
@@ -132,7 +141,6 @@ def main():
     #################
 
     print("Calling move method to give asa to app creator")
-    move_amount = 1
     sp = client.suggested_params()
     atc = AtomicTransactionComposer()
     # Opt in
@@ -151,6 +159,7 @@ def main():
         [created_nft_id, move_amount, app_addr, addr, 0, ZERO_ADDR],
     )
     atc.execute(client, 2)
+
 
     #################
     # Create Marketplace Application
@@ -172,8 +181,14 @@ def main():
     # List NFT for sale on marketplace
     #################
 
-    price = int(2e6)
-    offered_amount = 1
+    owner_balance = get_algo_balance(addr)
+    buyer_balance = get_algo_balance(buyer_addr)
+    royalty_receiver_balance = get_algo_balance(royalty_addr)
+
+    print("Owner Balance Before: {}".format(owner_balance))
+    print("Royalty Receiver Balance Before: {}".format(royalty_receiver_balance))
+    print("Buyer Balance Before: {}".format(buyer_balance))
+
 
     print("Calling list method on marketplace")
 
@@ -245,7 +260,14 @@ def main():
     atc.execute(client, 2)
     print("Bought ASA")
 
+    new_owner_balance = get_algo_balance(addr)
+    new_buyer_balance = get_algo_balance(buyer_addr)
+    new_royalty_receiver_balance = get_algo_balance(royalty_addr)
+
     # Balances should all match up
+    print("Owner Balance Delta: {}".format(new_owner_balance - owner_balance))
+    print("Royalty Receiver Balance Delta: {}".format(new_royalty_receiver_balance - royalty_receiver_balance))
+    print("Buyer Balance Delta: {}".format(new_buyer_balance - buyer_balance))
 
 
 if __name__ == "__main__":

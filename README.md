@@ -4,6 +4,8 @@
 The enforcement of royalty payments is an important requirement for creators and businesses that derive their income from secondary sales. This example demonstrates how one might implement the Royalty Enforcement contract as well as presenting a marketplace that adheres to the spec and provides an interface for listing and selling an asset subject to a Royalty Policy.
 
 
+# WARNING: This code is not audited and should not be used in a production environment  
+
 ## Running the demo
 
 Install the [sandbox](https://github.com/algorand/sandbox) and start it in any private network mode (`dev`,`release`,etc..)

@@ -342,7 +342,7 @@ def pay_algos(purchase_amt, owner, royalty_receiver, royalty_basis):
 
 @Subroutine(TealType.uint64)
 def royalty_amount(payment_amt, royalty_basis):
-    return WideRatio([payment_amt], [royalty_basis, Int(basis_point_multiplier)])
+    return WideRatio([payment_amt, royalty_basis], [Int(basis_point_multiplier)])
 
 
 @Subroutine(TealType.none)
