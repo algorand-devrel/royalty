@@ -86,9 +86,32 @@ def main():
     atc = AtomicTransactionComposer()
     atc.add_transaction(
         TransactionWithSigner(
-            txn=PaymentTxn(addr, sp, app_addr, int(1e8)), signer=addr_signer
+            txn=AssetCreateTxn(
+                addr,
+                sp,
+                1,
+                0,
+                True,
+                manager=app_addr,
+                freeze=app_addr,
+                clawback=app_addr,
+                unit_name="ra-ex",
+                asset_name="Royalty Asset",
+            ),
+            signer=addr_signer,
         )
     )
+    result = atc.execute(client, 2)
+    pti = client.pending_transaction_info(result.tx_ids[0])
+    created_nft_id = pti["asset-index"]
+    print("Created nft {}".format(created_nft_id))
+
+    #################
+    # App creator opt into app (since we use it later as the owner)
+    #################
+
+    sp = client.suggested_params()
+    atc = AtomicTransactionComposer()
     atc.add_transaction(
         TransactionWithSigner(
             txn=ApplicationCallTxn(addr, sp, app_id, OnComplete.OptInOC),
@@ -96,12 +119,14 @@ def main():
         )
     )
     atc.add_method_call(
-        app_id, get_method(enforcer_iface, "create_nft"), addr, sp, addr_signer
+        app_id,
+        get_method(enforcer_iface, "set_payment_asset"),
+        addr,
+        sp,
+        addr_signer,
+        [created_nft_id, True],
     )
-    results = atc.execute(client, 2)
-
-    created_nft_id = results.abi_results[0].return_value
-    print("Created nft {}".format(created_nft_id))
+    atc.execute(client, 2)
 
     #################
     # Set the royalty policy
@@ -133,30 +158,6 @@ def main():
         if type == 1:
             val = encoding.encode_address(base64.b64decode(sv["value"]["bytes"]))
         print("\t{}: {}".format(k, val))
-
-    #################
-    # Move NFT to app creator
-    #################
-
-    print("Calling move method to give asa to app creator")
-    sp = client.suggested_params()
-    atc = AtomicTransactionComposer()
-    # Opt in
-    atc.add_transaction(
-        TransactionWithSigner(
-            txn=AssetTransferTxn(addr, sp, addr, 0, created_nft_id), signer=addr_signer
-        )
-    )
-    # Move
-    atc.add_method_call(
-        app_id,
-        get_method(enforcer_iface, "royalty_free_move"),
-        addr,
-        sp,
-        addr_signer,
-        [created_nft_id, move_amount, app_addr, addr, 0, ZERO_ADDR],
-    )
-    atc.execute(client, 2)
 
     #################
     # Create Marketplace Application
@@ -269,6 +270,42 @@ def main():
         )
     )
     print("Buyer Balance Delta: {}".format(new_buyer_balance - buyer_balance))
+
+    #################
+    # Move NFT to back to app creator
+    #################
+
+    print()
+    print("Calling move method to give asa to app creator")
+    sp = client.suggested_params()
+    atc = AtomicTransactionComposer()
+    # Opt in
+    atc.add_transaction(
+        TransactionWithSigner(
+            txn=ApplicationOptInTxn(buyer_addr, sp, app_id),
+            signer=buyer_signer
+        )
+    )
+    # Offer
+    atc.add_method_call(
+        app_id,
+        get_method(enforcer_iface, "offer"),
+        buyer_addr,
+        sp,
+        buyer_signer,
+        method_args=[created_nft_id, offered_amount, addr, 0, ZERO_ADDR],
+    )
+    # Move
+    atc.add_method_call(
+        app_id,
+        get_method(enforcer_iface, "royalty_free_move"),
+        addr,
+        sp,
+        addr_signer,
+        [created_nft_id, move_amount, buyer_addr, addr, offered_amount, addr],
+    )
+    atc.execute(client, 2)
+    print("Original creator now owns the asset again")
 
 
 if __name__ == "__main__":

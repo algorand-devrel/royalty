@@ -81,7 +81,7 @@ def create_app(
     app_addr = logic.get_application_address(app_id)
 
     # Make sure the app address is funded with at least min balance
-    ptxn = PaymentTxn(addr, sp, app_addr, int(1e6))
+    ptxn = PaymentTxn(addr, sp, app_addr, int(1e8))
     txid = client.send_transaction(ptxn.sign(pk))
     wait_for_confirmation(client, txid, 4)
 

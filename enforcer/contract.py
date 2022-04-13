@@ -9,8 +9,6 @@ basis_point_multiplier = 100 * 100
 
 return_prefix = Bytes("base16", "0x151f7c75")  # Literally hash('return')[:4]
 
-create_selector = MethodSignature("create_nft()uint64")
-
 
 @Subroutine(TealType.bytes)
 def royalty_receiver():
@@ -32,29 +30,6 @@ def offered_auth(offer):
     return Extract(offer, Int(0), Int(32))
 
 
-@Subroutine(TealType.uint64)
-def create_nft():
-    return Seq(
-        InnerTxnBuilder.Begin(),
-        InnerTxnBuilder.SetFields(
-            {
-                TxnField.type_enum: TxnType.AssetConfig,
-                TxnField.config_asset_name: Bytes("Royalty Asset"),
-                TxnField.config_asset_unit_name: Bytes("ra"),
-                TxnField.config_asset_total: Int(1),
-                TxnField.config_asset_manager: Global.current_application_address(),
-                TxnField.config_asset_reserve: Global.current_application_address(),
-                TxnField.config_asset_freeze: Global.current_application_address(),
-                TxnField.config_asset_clawback: Global.current_application_address(),
-                TxnField.config_asset_default_frozen: Int(1),
-            }
-        ),
-        InnerTxnBuilder.Submit(),
-        Log(Concat(return_prefix, Itob(InnerTxn.created_asset_id()))),
-        Int(1),
-    )
-
-
 set_policy_selector = MethodSignature("set_royalty_policy(uint64,account)void")
 
 
@@ -74,7 +49,7 @@ def set_policy():
     )
 
 
-set_asset_selector = MethodSignature("set_payment_asset(asset,boolean)void")
+set_asset_selector = MethodSignature("set_payment_asset(asset,bool)void")
 
 
 @Subroutine(TealType.uint64)
@@ -252,7 +227,7 @@ def offer():
 
 
 royalty_free_move_selector = MethodSignature(
-    "royalty_free_move(asset,uint64,account,account,uint64,address)void"
+    "royalty_free_move(asset,uint64,account,account,uint64,account)void"
 )
 
 
@@ -265,22 +240,29 @@ def royalty_free_move():
     to_acct = Txn.accounts[Btoi(Txn.application_args[4])]
 
     prev_offered_amt = Btoi(Txn.application_args[5])
-    prev_offered_auth = Txn.application_args[6]
+    prev_offered_auth = Txn.accounts[Btoi(Txn.application_args[6])]
 
-    opted_in = App.optedIn(from_acct, Int(0))
+    offer = App.localGet(from_acct, Itob(asset_id))
 
+    curr_offer_amt = ScratchVar()
+    curr_offer_auth = ScratchVar()
     return Seq(
-        # Delete any offer if it exists
-        If(
-            opted_in,
-            update_offered(
-                from_acct,
-                Itob(asset_id),
-                Bytes(""),
-                Int(0),
-                prev_offered_auth,
-                prev_offered_amt,
-            ),
+        curr_offer_amt.store(offered_amount(offer)),
+        curr_offer_auth.store(offered_auth(offer)),
+        # Must match what is currently offered
+        Assert(curr_offer_amt.load() == prev_offered_amt),
+        Assert(curr_offer_auth.load() == prev_offered_auth),
+        # Must be set to app creator and less than the amount to move
+        Assert(curr_offer_auth.load() == Global.creator_address()),
+        Assert(curr_offer_amt.load() <= asset_amt),
+        # Delete the offer
+        update_offered(
+            from_acct,
+            Itob(asset_id),
+            Bytes(""),
+            Int(0),
+            prev_offered_auth,
+            prev_offered_amt,
         ),
         # Move it
         move_asset(asset_id, from_acct, to_acct, asset_amt),
@@ -302,14 +284,19 @@ def pay_assets(purchase_asset_id, purchase_amt, owner, royalty_receiver, royalty
                 TxnField.asset_receiver: owner,
             }
         ),
-        InnerTxnBuilder.Next(),
-        InnerTxnBuilder.SetFields(
-            {
-                TxnField.type_enum: TxnType.AssetTransfer,
-                TxnField.xfer_asset: purchase_asset_id,
-                TxnField.asset_amount: royalty_amt.load(),
-                TxnField.asset_receiver: royalty_receiver,
-            }
+        If(
+            royalty_amt.load() > Int(0),
+            Seq(
+                InnerTxnBuilder.Next(),
+                InnerTxnBuilder.SetFields(
+                    {
+                        TxnField.type_enum: TxnType.AssetTransfer,
+                        TxnField.xfer_asset: purchase_asset_id,
+                        TxnField.asset_amount: royalty_amt.load(),
+                        TxnField.asset_receiver: royalty_receiver,
+                    }
+                ),
+            ),
         ),
         InnerTxnBuilder.Submit(),
     )
@@ -328,13 +315,18 @@ def pay_algos(purchase_amt, owner, royalty_receiver, royalty_basis):
                 TxnField.receiver: owner,
             }
         ),
-        InnerTxnBuilder.Next(),
-        InnerTxnBuilder.SetFields(
-            {
-                TxnField.type_enum: TxnType.Payment,
-                TxnField.amount: royalty_amt.load(),
-                TxnField.receiver: royalty_receiver,
-            }
+        If(
+            royalty_amt.load() > Int(0),
+            Seq(
+                InnerTxnBuilder.Next(),
+                InnerTxnBuilder.SetFields(
+                    {
+                        TxnField.type_enum: TxnType.Payment,
+                        TxnField.amount: royalty_amt.load(),
+                        TxnField.receiver: royalty_receiver,
+                    }
+                ),
+            ),
         ),
         InnerTxnBuilder.Submit(),
     )
@@ -391,7 +383,6 @@ def approval():
     from_creator = Txn.sender() == Global.creator_address()
 
     action_router = Cond(
-        [And(Txn.application_args[0] == create_selector, from_creator), create_nft()],
         [
             And(Txn.application_args[0] == royalty_free_move_selector, from_creator),
             royalty_free_move(),

@@ -136,7 +136,7 @@
                 },
                 {
                     "name": "current_offered_auth",
-                    "type": "address"
+                    "type": "account"
                 }
             ],
             "returns": {
