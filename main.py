@@ -274,8 +274,7 @@ def main():
     # Opt in
     atc.add_transaction(
         TransactionWithSigner(
-            txn=ApplicationOptInTxn(buyer_addr, sp, app_id),
-            signer=buyer_signer
+            txn=ApplicationOptInTxn(buyer_addr, sp, app_id), signer=buyer_signer
         )
     )
     # Offer
