@@ -118,14 +118,6 @@ def main():
             signer=addr_signer,
         )
     )
-    atc.add_method_call(
-        app_id,
-        get_method(enforcer_iface, "set_payment_asset"),
-        addr,
-        sp,
-        addr_signer,
-        [created_nft_id, True],
-    )
     atc.execute(client, 2)
 
     #################
