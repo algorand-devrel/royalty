@@ -8,15 +8,17 @@ The enforcement of royalty payments is an important requirement for creators and
 
 ## Running the demo
 
+*Requires Python >= 3.10*
+
 Install the [sandbox](https://github.com/algorand/sandbox) and start it in any private network mode (`dev`,`release`,etc..)
 
 Clone this repository, initialize a virtual environment and install requirements
 ```sh
 git clone git@github.com:algorand-devrel/royalty.git
 cd royalty
-python3 -m venv .venv
+python3.10 -m venv .venv
 source .venv/bin/activate
-pip install pyteal
+pip install git+https://github.com/algorand/pyteal@feature/abi
 ```
 
 Run the example
@@ -27,6 +29,5 @@ python main.py
 You should see some printed statements from the methods defined in the ARC being called.
 
 Comments on the specific calls an contracts are inline.
-
 
 Happy hacking :)
