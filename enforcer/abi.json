@@ -20,7 +20,7 @@
                 },
                 {
                     "name": "royalty_receiver",
-                    "type": "account"
+                    "type": "address"
                 }
             ],
             "returns": {"type":"void"}
@@ -54,7 +54,7 @@
                 },
                 {
                     "name": "authorized_address",
-                    "type": "account"
+                    "type": "address"
                 },
                 {
                     "name": "current_offered_amount",
@@ -136,7 +136,7 @@
                 },
                 {
                     "name": "current_offered_auth",
-                    "type": "account"
+                    "type": "address"
                 }
             ],
             "returns": {
@@ -154,9 +154,18 @@
                 },
                 {
                     "name": "from",
-                    "type": "uint64"
+                    "type": "account"
                 }
             ],
+            "returns": {
+                "type": "(address,uint64)"
+            }
+        },
+        {
+            "name": "get_policy",
+            "desc": "Gets the royalty policy specified by the contract",
+            "readonly": true,
+            "args": [],
             "returns": {
                 "type": "(address,uint64)"
             }

@@ -1,4 +1,5 @@
 from pyteal import *
+from typing import Literal
 
 
 r_basis_key = Bytes("royalty_basis")
@@ -6,8 +7,6 @@ r_recv_key = Bytes("royalty_receiver")
 
 # A basis point is 1/100 of 1%
 basis_point_multiplier = 100 * 100
-
-return_prefix = Bytes("base16", "0x151f7c75")  # Literally hash('return')[:4]
 
 
 @Subroutine(TealType.bytes)
@@ -30,21 +29,21 @@ def offered_auth(offer):
     return Extract(offer, Int(0), Int(32))
 
 
-set_policy_selector = MethodSignature("set_royalty_policy(uint64,account)void")
+set_policy_selector = MethodSignature("set_royalty_policy(uint64,address)void")
 
 
 @Subroutine(TealType.uint64)
 def set_policy():
-    r_basis = Btoi(Txn.application_args[1])
-    r_recv = Txn.accounts[Btoi(Txn.application_args[2])]
     return Seq(
+        (r_basis := abi.Uint64()).decode(Txn.application_args[1]),
+        (r_recv := abi.Address()).decode(Txn.application_args[2]),
         (r_basis_stored := App.globalGetEx(Int(0), r_basis_key)),
         (r_recv_stored := App.globalGetEx(Int(0), r_recv_key)),
         Assert(Not(r_basis_stored.hasValue())),
         Assert(Not(r_recv_stored.hasValue())),
-        Assert(r_basis <= Int(basis_point_multiplier)),
-        App.globalPut(r_basis_key, r_basis),
-        App.globalPut(r_recv_key, r_recv),
+        Assert(r_basis.get() <= Int(basis_point_multiplier)),
+        App.globalPut(r_basis_key, r_basis.get()),
+        App.globalPut(r_recv_key, r_recv.get()),
         Int(1),
     )
 
@@ -198,7 +197,7 @@ def transfer():
     )
 
 
-offer_selector = MethodSignature("offer(asset,uint64,account,uint64,address)void")
+offer_selector = MethodSignature("offer(asset,uint64,address,uint64,address)void")
 
 
 @Subroutine(TealType.uint64)
@@ -206,7 +205,7 @@ def offer():
     asset_id = Txn.assets[Btoi(Txn.application_args[1])]
     asset_amt = Btoi(Txn.application_args[2])
 
-    auth_acct = Txn.accounts[Btoi(Txn.application_args[3])]
+    auth_acct = Txn.application_args[3]
     prev_amt = Btoi(Txn.application_args[4])
 
     prev_auth = Txn.application_args[5]
@@ -227,7 +226,7 @@ def offer():
 
 
 royalty_free_move_selector = MethodSignature(
-    "royalty_free_move(asset,uint64,account,account,uint64,account)void"
+    "royalty_free_move(asset,uint64,account,account,uint64,address)void"
 )
 
 
@@ -240,7 +239,7 @@ def royalty_free_move():
     to_acct = Txn.accounts[Btoi(Txn.application_args[4])]
 
     prev_offered_amt = Btoi(Txn.application_args[5])
-    prev_offered_auth = Txn.accounts[Btoi(Txn.application_args[6])]
+    prev_offered_auth = Txn.application_args[6]
 
     offer = App.localGet(from_acct, Itob(asset_id))
 
@@ -379,6 +378,39 @@ def update_offered(acct, asset, auth, amt, prev_auth, prev_amt):
     )
 
 
+get_offer_selector = MethodSignature("get_offer(uint64,account)(address,uint64)")
+
+
+@Subroutine(TealType.uint64)
+def get_offer():
+    offered_asset = Txn.application_args[1]
+    offering_acct = Txn.accounts[Btoi(Txn.application_args[2])]
+
+    return Seq(
+        stored_offer := App.localGetEx(offering_acct, Int(0), offered_asset),
+        Assert(stored_offer.hasValue()),
+        (addr := abi.Address()).decode(offered_auth(stored_offer.value())),
+        (amt := abi.Uint64()).set(offered_amount(stored_offer.value())),
+        (ret := abi.Tuple(abi.AddressTypeSpec(), abi.Uint64TypeSpec())).set(addr, amt),
+        abi.MethodReturn(ret),
+        Int(1),
+    )
+
+
+get_policy_selector = MethodSignature("get_policy()(address,uint64)")
+
+
+@Subroutine(TealType.uint64)
+def get_policy():
+    return Seq(
+        (addr := abi.Address()).decode(royalty_receiver()),
+        (amt := abi.Uint64()).set(royalty_basis()),
+        (ret := abi.Tuple(abi.AddressTypeSpec(), abi.Uint64TypeSpec())).set(addr, amt),
+        abi.MethodReturn(ret),
+        Int(1),
+    )
+
+
 def approval():
     from_creator = Txn.sender() == Global.creator_address()
 
@@ -397,6 +429,8 @@ def approval():
         ],
         [Txn.application_args[0] == transfer_selector, transfer()],
         [Txn.application_args[0] == offer_selector, offer()],
+        [Txn.application_args[0] == get_offer_selector, get_offer()],
+        [Txn.application_args[0] == get_policy_selector, get_policy()],
     )
 
     return Cond(

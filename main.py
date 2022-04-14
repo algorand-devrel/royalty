@@ -140,6 +140,19 @@ def main():
     # Get policy from global state of app
     #################
 
+    print("Calling get_policy method")
+    atc = AtomicTransactionComposer()
+    atc.add_method_call(
+        app_id,
+        get_method(enforcer_iface, "get_policy"),
+        addr,
+        sp,
+        addr_signer,
+    )
+    results = atc.execute(client, 2)
+    print("Got: {}".format(results.abi_results[0].return_value))
+
+    print("Getting the policy from global state")
     app_info = client.application_info(app_id)
     state = app_info["params"]["global-state"]
     print("Policy for app id: {}".format(app_id))
@@ -204,13 +217,27 @@ def main():
         addr_signer,
         [created_nft_id, app_id, offered_amount, price, grp[0]],
     )
+
     atc.execute(client, 2)
     print("Listed asset for sale")
 
     #################
     # Get offered details
     #################
+    print("Calling get_offer method")
+    atc = AtomicTransactionComposer()
+    atc.add_method_call(
+        app_id,
+        get_method(enforcer_iface, "get_offer"),
+        addr,
+        sp,
+        addr_signer,
+        method_args=[created_nft_id, addr],
+    )
+    results = atc.execute(client, 2)
+    print("Got: {}".format(results.abi_results[0].return_value))
 
+    print("Getting offer directly from local state")
     aai = client.account_application_info(addr, app_id)
     local_state = aai["app-local-state"]["key-value"]
     for lsv in local_state:
