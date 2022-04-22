@@ -2,6 +2,7 @@ from pyteal import *
 from typing import Literal
 
 
+administrator_key = Bytes("administrator")
 r_basis_key = Bytes("royalty_basis")
 r_recv_key = Bytes("royalty_receiver")
 
@@ -18,6 +19,12 @@ def royalty_receiver():
 def royalty_basis():
     return App.globalGet(r_basis_key)
 
+@Subroutine(TealType.bytes)
+def administrator():
+    return Seq(
+        (admin := App.globalGetEx(Int(0), administrator_key)),
+        If(admin.hasValue(), admin.value(), Global.creator_address())
+    )
 
 @Subroutine(TealType.uint64)
 def offered_amount(offer):
@@ -28,6 +35,15 @@ def offered_amount(offer):
 def offered_auth(offer):
     return Extract(offer, Int(0), Int(32))
 
+
+set_administrator_selector = MethodSignature("set_administrator(address)void")
+
+@Subroutine(TealType.uint64)
+def set_administrator():
+    return Seq(
+        (new_admin := abi.Address()).decode(Txn.application_args[1]),
+        put_administrator(new_admin.encode()),
+    )
 
 set_policy_selector = MethodSignature("set_royalty_policy(uint64,address)void")
 
@@ -378,6 +394,14 @@ def update_offered(acct, asset, auth, amt, prev_auth, prev_amt):
     )
 
 
+@Subroutine(TealType.uint64)
+def put_administrator(admin: Expr):
+    return Seq(
+        App.globalPut(administrator_key, admin),
+        Int(1)
+    )
+
+
 get_offer_selector = MethodSignature("get_offer(uint64,account)(address,uint64)")
 
 
@@ -391,7 +415,7 @@ def get_offer():
         Assert(stored_offer.hasValue()),
         (addr := abi.Address()).decode(offered_auth(stored_offer.value())),
         (amt := abi.Uint64()).set(offered_amount(stored_offer.value())),
-        (ret := abi.Tuple(abi.AddressTypeSpec(), abi.Uint64TypeSpec())).set(addr, amt),
+        (ret := abi.Tuple(abi.TupleTypeSpec(abi.AddressTypeSpec(), abi.Uint64TypeSpec()))).set(addr, amt),
         abi.MethodReturn(ret),
         Int(1),
     )
@@ -405,38 +429,55 @@ def get_policy():
     return Seq(
         (addr := abi.Address()).decode(royalty_receiver()),
         (amt := abi.Uint64()).set(royalty_basis()),
-        (ret := abi.Tuple(abi.AddressTypeSpec(), abi.Uint64TypeSpec())).set(addr, amt),
+        (ret := abi.Tuple(abi.TupleTypeSpec(abi.AddressTypeSpec(), abi.Uint64TypeSpec()))).set(addr, amt),
         abi.MethodReturn(ret),
         Int(1),
     )
 
+get_administrator_selector = MethodSignature("get_administrator()address")
+
+@Subroutine(TealType.uint64)
+def get_administrator():
+    return Seq(
+        (admin := abi.Address()).decode(administrator()),
+        abi.MethodReturn(admin),
+        Int(1)
+    )
+
 
 def approval():
-    from_creator = Txn.sender() == Global.creator_address()
+    from_administrator = Txn.sender() == administrator() 
+
+
 
     action_router = Cond(
         [
-            And(Txn.application_args[0] == royalty_free_move_selector, from_creator),
+            And(Txn.application_args[0] == royalty_free_move_selector, from_administrator),
             royalty_free_move(),
         ],
         [
-            And(Txn.application_args[0] == set_policy_selector, from_creator),
+            And(Txn.application_args[0] == set_policy_selector, from_administrator),
             set_policy(),
         ],
         [
-            And(Txn.application_args[0] == set_asset_selector, from_creator),
+            And(Txn.application_args[0] == set_asset_selector, from_administrator),
             set_asset(),
+        ],
+        [
+            And(Txn.application_args[0] == set_administrator_selector, from_administrator),
+            set_administrator(),
         ],
         [Txn.application_args[0] == transfer_selector, transfer()],
         [Txn.application_args[0] == offer_selector, offer()],
         [Txn.application_args[0] == get_offer_selector, get_offer()],
         [Txn.application_args[0] == get_policy_selector, get_policy()],
+        [Txn.application_args[0] == get_administrator_selector, get_administrator()],
     )
 
     return Cond(
-        [Txn.application_id() == Int(0), Approve()],
-        [Txn.on_completion() == OnComplete.DeleteApplication, Return(from_creator)],
-        [Txn.on_completion() == OnComplete.UpdateApplication, Return(from_creator)],
+        [Txn.application_id() == Int(0), Return(put_administrator(Txn.sender()))],
+        [Txn.on_completion() == OnComplete.DeleteApplication, Return(from_administrator)],
+        [Txn.on_completion() == OnComplete.UpdateApplication, Return(from_administrator)],
         [Txn.on_completion() == OnComplete.OptIn, Approve()],
         [Txn.on_completion() == OnComplete.CloseOut, Approve()],
         [Txn.on_completion() == OnComplete.NoOp, Return(action_router)],

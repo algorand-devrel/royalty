@@ -2,12 +2,16 @@
     "name": "demo-arc-18",
     "methods": [
         {
-            "name": "create_nft",
-            "desc": "Create an nft with appropriate parameters, return its id",
-            "args": [],
-            "returns": {
-                "name": "asset_id",
-                "type": "uint64"
+            "name": "set_administrator",
+            "desc": "Sets the administrator for this royalty enforcer",
+            "args": [
+                {
+                    "name": "administrator",
+                    "type": "address"
+                }
+            ],
+            "returns":{
+                "type":"void"
             }
         },
         {
@@ -168,6 +172,15 @@
             "args": [],
             "returns": {
                 "type": "(address,uint64)"
+            }
+        },
+        {
+            "name": "get_administrator",
+            "desc": "Gets the administrator for this royalty enforcer application",
+            "readonly": true,
+            "args": [],
+            "returns": {
+                "type": "address"
             }
         }
     ]

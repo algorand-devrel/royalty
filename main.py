@@ -73,7 +73,7 @@ def main():
         pk,
         enforcer.get_approval,
         enforcer.get_clear,
-        global_schema=StateSchema(1, 1),
+        global_schema=StateSchema(1, 2),
         local_schema=StateSchema(0, 16),
     )
     print("Created royalty-enforcment app {} ({})".format(app_id, app_addr))
@@ -119,6 +119,67 @@ def main():
         )
     )
     atc.execute(client, 2)
+
+    #################
+    # Set the administrator (then revert)
+    #################
+    print("Calling get_administrator")
+    sp = client.suggested_params()
+    atc = AtomicTransactionComposer()
+    atc.add_method_call(
+        app_id,
+        get_method(enforcer_iface, "get_administrator"),
+        addr,
+        sp,
+        addr_signer,
+    )
+    #TODO: really should just dryrun this 
+    results = atc.execute(client, 2)
+    print("Current admin: {}".format(results.abi_results[0].return_value))
+
+    print("Calling set_administrator method to set to a new address")
+    sp = client.suggested_params()
+    atc = AtomicTransactionComposer()
+    atc.add_method_call(
+        app_id,
+        get_method(enforcer_iface, "set_administrator"),
+        addr,
+        sp,
+        addr_signer,
+        method_args=[buyer_addr],
+    )
+    atc.execute(client, 2)
+
+    print("Calling get_administrator")
+    sp = client.suggested_params()
+    atc = AtomicTransactionComposer()
+    atc.add_method_call(
+        app_id,
+        get_method(enforcer_iface, "get_administrator"),
+        addr,
+        sp,
+        addr_signer,
+    )
+    #TODO: really should just dryrun this 
+    results = atc.execute(client, 2)
+    print("Current admin: {}".format(results.abi_results[0].return_value))
+
+    print("Calling set_administrator method to set back to original creator")
+    sp = client.suggested_params()
+    atc = AtomicTransactionComposer()
+    atc.add_method_call(
+        app_id,
+        get_method(enforcer_iface, "set_administrator"),
+        buyer_addr,
+        sp,
+        buyer_signer,
+        method_args=[addr],
+    )
+    atc.execute(client, 2)
+
+
+
+
 
     #################
     # Set the royalty policy
