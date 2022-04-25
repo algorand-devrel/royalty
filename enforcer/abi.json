@@ -166,7 +166,7 @@
             }
         },
         {
-            "name": "get_policy",
+            "name": "get_royalty_policy",
             "desc": "Gets the royalty policy specified by the contract",
             "readonly": true,
             "args": [],

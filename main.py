@@ -201,11 +201,11 @@ def main():
     # Get policy from global state of app
     #################
 
-    print("Calling get_policy method")
+    print("Calling get_royalty_policy method")
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "get_policy"),
+        get_method(enforcer_iface, "get_royalty_policy"),
         addr,
         sp,
         addr_signer,
