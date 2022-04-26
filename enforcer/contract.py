@@ -170,12 +170,12 @@ def transfer():
     )
 
     return Seq(
-        # initialize values to check rekey
-        (owner_auth := AccountParam.authAddr(owner_acct)),
-        (buyer_auth := AccountParam.authAddr(buyer_acct)),
-        # Make sure neither owner/buyer have been rekeyed (OPTIONAL)
-        Assert(owner_auth.value() == Global.zero_address()),
-        Assert(buyer_auth.value() == Global.zero_address()),
+        ## initialize values to check rekey
+        #(owner_auth := AccountParam.authAddr(owner_acct)),
+        #(buyer_auth := AccountParam.authAddr(buyer_acct)),
+        ## Make sure neither owner/buyer have been rekeyed (OPTIONAL)
+        #Assert(owner_auth.value() == Global.zero_address()),
+        #Assert(buyer_auth.value() == Global.zero_address()),
         # Grab the royalty policy settings
         stored_royalty_recv.store(royalty_receiver()),
         stored_royalty_basis.store(royalty_basis()),
