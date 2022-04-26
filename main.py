@@ -185,11 +185,11 @@ def main():
     # Set the royalty policy
     #################
 
-    print("Calling set_royalty_policy method")
+    print("Calling set_policy method")
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "set_royalty_policy"),
+        get_method(enforcer_iface, "set_policy"),
         addr,
         sp,
         addr_signer,
@@ -201,11 +201,11 @@ def main():
     # Get policy from global state of app
     #################
 
-    print("Calling get_royalty_policy method")
+    print("Calling get_policy method")
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "get_royalty_policy"),
+        get_method(enforcer_iface, "get_policy"),
         addr,
         sp,
         addr_signer,
@@ -381,7 +381,7 @@ def main():
         addr,
         sp,
         addr_signer,
-        [created_nft_id, move_amount, buyer_addr, addr, offered_amount, addr],
+        [created_nft_id, move_amount, buyer_addr, addr, offered_amount],
     )
     atc.execute(client, 2)
     print("Original creator now owns the asset again")

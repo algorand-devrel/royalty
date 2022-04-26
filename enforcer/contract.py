@@ -45,7 +45,7 @@ def set_administrator():
         put_administrator(new_admin.encode()),
     )
 
-set_policy_selector = MethodSignature("set_royalty_policy(uint64,address)void")
+set_policy_selector = MethodSignature("set_policy(uint64,address)void")
 
 
 @Subroutine(TealType.uint64)
@@ -113,17 +113,17 @@ def set_asset():
 
 
 transfer_selector = MethodSignature(
-    "transfer(asset,account,account,account,uint64,txn,asset,uint64)void"
+    "transfer(asset,uint64,account,account,account,txn,asset,uint64)void"
 )
 
 
 @Subroutine(TealType.uint64)
 def transfer():
     asset_id = Txn.assets[Btoi(Txn.application_args[1])]
-    owner_acct = Txn.accounts[Btoi(Txn.application_args[2])]
-    buyer_acct = Txn.accounts[Btoi(Txn.application_args[3])]
-    royalty_acct = Txn.accounts[Btoi(Txn.application_args[4])]
-    asset_amt = Btoi(Txn.application_args[5])
+    asset_amt = Btoi(Txn.application_args[2])
+    owner_acct = Txn.accounts[Btoi(Txn.application_args[3])]
+    buyer_acct = Txn.accounts[Btoi(Txn.application_args[4])]
+    royalty_acct = Txn.accounts[Btoi(Txn.application_args[5])]
     purchase_txn = Gtxn[Txn.group_index() - Int(1)]
     # Unusued, just passed in args to let the app have access in foreign assets
     # asset_idx  = Txn.application_args[6]
@@ -242,7 +242,7 @@ def offer():
 
 
 royalty_free_move_selector = MethodSignature(
-    "royalty_free_move(asset,uint64,account,account,uint64,address)void"
+    "royalty_free_move(asset,uint64,account,account,uint64)void"
 )
 
 
@@ -255,7 +255,7 @@ def royalty_free_move():
     to_acct = Txn.accounts[Btoi(Txn.application_args[4])]
 
     prev_offered_amt = Btoi(Txn.application_args[5])
-    prev_offered_auth = Txn.application_args[6]
+    prev_offered_auth = Txn.sender()
 
     offer = App.localGet(from_acct, Itob(asset_id))
 
@@ -268,7 +268,7 @@ def royalty_free_move():
         Assert(curr_offer_amt.load() == prev_offered_amt),
         Assert(curr_offer_auth.load() == prev_offered_auth),
         # Must be set to app creator and less than the amount to move
-        Assert(curr_offer_auth.load() == Global.creator_address()),
+        Assert(curr_offer_auth.load() == administrator()),
         Assert(curr_offer_amt.load() <= asset_amt),
         # Delete the offer
         update_offered(

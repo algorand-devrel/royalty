@@ -1,5 +1,5 @@
 {
-    "name": "demo-arc-18",
+    "name":"demo-arc-18",
     "methods": [
         {
             "name": "set_administrator",
@@ -15,8 +15,8 @@
             }
         },
         {
-            "name": "set_royalty_policy",
-            "desc": "Sets the royalty basis for a given app id",
+            "name": "set_policy",
+            "desc": "Sets the royalty basis for this royalty enforcer",
             "args": [
                 {
                     "name": "royalty_basis",
@@ -57,15 +57,15 @@
                     "type": "uint64"
                 },
                 {
-                    "name": "authorized_address",
+                    "name": "auth_address",
                     "type": "address"
                 },
                 {
-                    "name": "current_offered_amount",
+                    "name": "offered_amount",
                     "type": "uint64"
                 },
                 {
-                    "name": "current_offered_auth",
+                    "name": "offered_auth_addr",
                     "type": "address"
                 }
             ],
@@ -82,6 +82,10 @@
                     "type": "asset"
                 },
                 {
+                    "name": "royalty_asset_amount",
+                    "type": "uint64"
+                },
+                {
                     "name": "from",
                     "type": "account"
                 },
@@ -94,10 +98,6 @@
                     "type": "account"
                 },
                 {
-                    "name": "royalty_asset_amount",
-                    "type": "uint64"
-                },
-                {
                     "name": "payment",
                     "type": "txn"
                 },
@@ -106,7 +106,7 @@
                     "type": "asset"
                 },
                 {
-                    "name": "current_offered_amount",
+                    "name": "offered_amount",
                     "type": "uint64"
                 }
             ],
@@ -135,12 +135,8 @@
                     "type": "account"
                 },
                 {
-                    "name": "current_offered_amount",
+                    "name": "offered_amount",
                     "type": "uint64"
-                },
-                {
-                    "name": "current_offered_auth",
-                    "type": "address"
                 }
             ],
             "returns": {
@@ -166,7 +162,7 @@
             }
         },
         {
-            "name": "get_royalty_policy",
+            "name": "get_policy",
             "desc": "Gets the royalty policy specified by the contract",
             "readonly": true,
             "args": [],

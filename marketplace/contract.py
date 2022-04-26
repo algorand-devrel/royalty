@@ -100,13 +100,13 @@ def buy_nft():
                 TxnField.application_id: app_id,
                 TxnField.application_args: [
                     MethodSignature(
-                        "transfer(asset,account,account,account,uint64,txn,asset,uint64)void"
+                        "transfer(asset,uint64,account,account,account,txn,asset,uint64)void"
                     ),
                     Itob(Int(0)),  # Royalty Asset in 0th position of asset array
+                    Itob(asset_amount),  # The number of units being purchased
                     Itob(Int(1)),  # Current owner first element here but offset by 1
                     Itob(Int(2)),  # Buyer
                     Itob(Int(3)),  # Who we need to pay for royalties
-                    Itob(asset_amount),  # The number of units being purchased
                     Itob(Int(0)),  # Asset idx of 0, should be ignored
                     Itob(
                         offered_amount(current_offer.value())
