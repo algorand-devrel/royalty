@@ -421,6 +421,8 @@ def get_approval():
 def get_clear():
     return clear
 
+def get_contract():
+    return contract
 
 if __name__ == "__main__":
     import json

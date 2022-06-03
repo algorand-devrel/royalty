@@ -135,7 +135,7 @@ def offered_auth(offer):
     return Extract(offer, Int(0), Int(32))
 
 
-approval, clear, spec = router.compile_program(
+approval, clear, contract = router.compile_program(
     version=6, optimize=OptimizeOptions(scratch_slots=True)
 )
 
@@ -146,6 +146,10 @@ def get_approval():
 
 def get_clear():
     return clear
+
+def get_contract():
+    return contract
+
 
 
 if __name__ == "__main__":
