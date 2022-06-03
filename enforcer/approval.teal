@@ -1,0 +1,917 @@
+#pragma version 6
+txn NumAppArgs
+int 0
+==
+bnz main_l20
+txna ApplicationArgs 0
+method "set_administrator(address)void"
+==
+bnz main_l19
+txna ApplicationArgs 0
+method "set_policy(uint64,address)void"
+==
+bnz main_l18
+txna ApplicationArgs 0
+method "set_asset(asset,bool)void"
+==
+bnz main_l17
+txna ApplicationArgs 0
+method "transfer(asset,uint64,account,account,account,txn,asset,uint64)void"
+==
+bnz main_l16
+txna ApplicationArgs 0
+method "offer(asset,uint64,address,uint64,address)void"
+==
+bnz main_l15
+txna ApplicationArgs 0
+method "royalty_free_move(asset,uint64,account,account,uint64)void"
+==
+bnz main_l14
+txna ApplicationArgs 0
+method "get_offer(uint64,account)(address,uint64)"
+==
+bnz main_l13
+txna ApplicationArgs 0
+method "get_policy()(address,uint64)"
+==
+bnz main_l12
+txna ApplicationArgs 0
+method "get_administrator()address"
+==
+bnz main_l11
+err
+main_l11:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+callsub getadministrator_19
+store 32
+byte 0x151f7c75
+load 32
+concat
+log
+int 1
+return
+main_l12:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+callsub getpolicy_18
+store 29
+byte 0x151f7c75
+load 29
+concat
+log
+int 1
+return
+main_l13:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+txna ApplicationArgs 1
+btoi
+store 22
+txna ApplicationArgs 2
+int 0
+getbyte
+store 23
+load 22
+load 23
+callsub getoffer_17
+store 24
+byte 0x151f7c75
+load 24
+concat
+log
+int 1
+return
+main_l14:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+txna ApplicationArgs 1
+int 0
+getbyte
+store 17
+txna ApplicationArgs 2
+btoi
+store 18
+txna ApplicationArgs 3
+int 0
+getbyte
+store 19
+txna ApplicationArgs 4
+int 0
+getbyte
+store 20
+txna ApplicationArgs 5
+btoi
+store 21
+load 17
+load 18
+load 19
+load 20
+load 21
+callsub royaltyfreemove_16
+int 1
+return
+main_l15:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+txna ApplicationArgs 1
+int 0
+getbyte
+store 12
+txna ApplicationArgs 2
+btoi
+store 13
+txna ApplicationArgs 3
+store 14
+txna ApplicationArgs 4
+btoi
+store 15
+txna ApplicationArgs 5
+store 16
+load 12
+load 13
+load 14
+load 15
+load 16
+callsub offer_15
+int 1
+return
+main_l16:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+txna ApplicationArgs 1
+int 0
+getbyte
+store 4
+txna ApplicationArgs 2
+btoi
+store 5
+txna ApplicationArgs 3
+int 0
+getbyte
+store 6
+txna ApplicationArgs 4
+int 0
+getbyte
+store 7
+txna ApplicationArgs 5
+int 0
+getbyte
+store 8
+txna ApplicationArgs 6
+int 0
+getbyte
+store 10
+txna ApplicationArgs 7
+btoi
+store 11
+txn GroupIndex
+int 1
+-
+store 9
+load 4
+load 5
+load 6
+load 7
+load 8
+load 9
+load 10
+load 11
+callsub transfer_14
+int 1
+return
+main_l17:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+txna ApplicationArgs 1
+int 0
+getbyte
+store 2
+txna ApplicationArgs 2
+int 0
+int 8
+*
+getbit
+store 3
+load 2
+load 3
+callsub setasset_13
+int 1
+return
+main_l18:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+txna ApplicationArgs 1
+btoi
+store 0
+txna ApplicationArgs 2
+store 1
+load 0
+load 1
+callsub setpolicy_12
+int 1
+return
+main_l19:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+txna ApplicationArgs 1
+callsub setadministrator_11
+int 1
+return
+main_l20:
+txn OnCompletion
+int NoOp
+==
+bnz main_l30
+txn OnCompletion
+int OptIn
+==
+bnz main_l29
+txn OnCompletion
+int CloseOut
+==
+bnz main_l28
+txn OnCompletion
+int UpdateApplication
+==
+bnz main_l27
+txn OnCompletion
+int DeleteApplication
+==
+bnz main_l26
+err
+main_l26:
+txn Sender
+callsub getadmin_0
+==
+return
+main_l27:
+txn Sender
+callsub getadmin_0
+==
+return
+main_l28:
+int 1
+return
+main_l29:
+int 1
+return
+main_l30:
+txn ApplicationID
+int 0
+==
+assert
+txn Sender
+callsub putadmin_1
+int 1
+return
+
+// get_admin
+getadmin_0:
+int 0
+byte "administrator"
+app_global_get_ex
+store 34
+store 33
+load 34
+bnz getadmin_0_l2
+global CreatorAddress
+b getadmin_0_l3
+getadmin_0_l2:
+load 33
+getadmin_0_l3:
+retsub
+
+// put_admin
+putadmin_1:
+store 35
+byte "administrator"
+load 35
+app_global_put
+retsub
+
+// royalty_receiver
+royaltyreceiver_2:
+byte "royalty_receiver"
+app_global_get
+retsub
+
+// royalty_basis
+royaltybasis_3:
+byte "royalty_basis"
+app_global_get
+retsub
+
+// offered_amount
+offeredamount_4:
+int 32
+extract_uint64
+retsub
+
+// offered_auth
+offeredauth_5:
+extract 0 32
+retsub
+
+// pay_assets
+payassets_6:
+store 63
+store 62
+store 61
+store 60
+store 59
+load 60
+load 63
+callsub royaltyamount_8
+store 64
+itxn_begin
+int axfer
+itxn_field TypeEnum
+load 59
+itxn_field XferAsset
+load 60
+load 64
+-
+itxn_field AssetAmount
+load 61
+itxn_field AssetReceiver
+load 64
+int 0
+>
+bz payassets_6_l2
+itxn_next
+int axfer
+itxn_field TypeEnum
+load 59
+itxn_field XferAsset
+load 64
+itxn_field AssetAmount
+load 62
+itxn_field AssetReceiver
+payassets_6_l2:
+itxn_submit
+retsub
+
+// pay_algos
+payalgos_7:
+store 68
+store 67
+store 66
+store 65
+load 65
+load 68
+callsub royaltyamount_8
+store 69
+itxn_begin
+int pay
+itxn_field TypeEnum
+load 65
+load 69
+-
+itxn_field Amount
+load 66
+itxn_field Receiver
+load 69
+int 0
+>
+bz payalgos_7_l2
+itxn_next
+int pay
+itxn_field TypeEnum
+load 69
+itxn_field Amount
+load 67
+itxn_field Receiver
+payalgos_7_l2:
+itxn_submit
+retsub
+
+// royalty_amount
+royaltyamount_8:
+mulw
+int 0
+int 10000
+divmodw
+pop
+pop
+swap
+!
+assert
+retsub
+
+// move_asset
+moveasset_9:
+store 73
+store 72
+store 71
+store 70
+itxn_begin
+int axfer
+itxn_field TypeEnum
+load 70
+itxn_field XferAsset
+load 73
+itxn_field AssetAmount
+load 71
+itxn_field AssetSender
+load 72
+itxn_field AssetReceiver
+itxn_submit
+retsub
+
+// update_offered
+updateoffered_10:
+store 79
+store 78
+store 77
+store 76
+store 75
+store 74
+load 74
+int 0
+load 75
+app_local_get_ex
+store 81
+store 80
+load 81
+bnz updateoffered_10_l5
+load 79
+int 0
+==
+load 78
+global ZeroAddress
+==
+&&
+assert
+updateoffered_10_l2:
+load 77
+int 0
+>
+bnz updateoffered_10_l4
+load 74
+load 75
+app_local_del
+b updateoffered_10_l6
+updateoffered_10_l4:
+load 74
+load 75
+load 76
+load 77
+itob
+concat
+app_local_put
+b updateoffered_10_l6
+updateoffered_10_l5:
+load 80
+callsub offeredamount_4
+load 79
+==
+load 80
+callsub offeredauth_5
+load 78
+==
+&&
+assert
+b updateoffered_10_l2
+updateoffered_10_l6:
+retsub
+
+// set_administrator
+setadministrator_11:
+store 36
+txn Sender
+callsub getadmin_0
+==
+assert
+load 36
+callsub putadmin_1
+retsub
+
+// set_policy
+setpolicy_12:
+store 38
+store 37
+txn Sender
+callsub getadmin_0
+==
+assert
+int 0
+byte "royalty_basis"
+app_global_get_ex
+store 40
+store 39
+int 0
+byte "royalty_receiver"
+app_global_get_ex
+store 42
+store 41
+load 40
+!
+assert
+load 42
+!
+assert
+load 37
+int 10000
+<=
+assert
+byte "royalty_basis"
+load 37
+app_global_put
+byte "royalty_receiver"
+load 38
+app_global_put
+retsub
+
+// set_asset
+setasset_13:
+store 44
+store 43
+txn Sender
+callsub getadmin_0
+==
+assert
+global CurrentApplicationAddress
+load 43
+txnas Assets
+asset_holding_get AssetBalance
+store 46
+store 45
+load 43
+txnas Assets
+asset_params_get AssetCreator
+store 48
+store 47
+load 44
+load 46
+!
+&&
+bnz setasset_13_l3
+load 44
+!
+load 46
+&&
+bz setasset_13_l4
+itxn_begin
+int axfer
+itxn_field TypeEnum
+load 43
+txnas Assets
+itxn_field XferAsset
+int 0
+itxn_field AssetAmount
+load 47
+itxn_field AssetCloseTo
+load 47
+itxn_field AssetReceiver
+itxn_submit
+b setasset_13_l4
+setasset_13_l3:
+itxn_begin
+int axfer
+itxn_field TypeEnum
+load 43
+txnas Assets
+itxn_field XferAsset
+int 0
+itxn_field AssetAmount
+global CurrentApplicationAddress
+itxn_field AssetReceiver
+itxn_submit
+setasset_13_l4:
+retsub
+
+// transfer
+transfer_14:
+store 56
+store 55
+store 54
+store 53
+store 52
+store 51
+store 50
+store 49
+callsub royaltyreceiver_2
+store 57
+callsub royaltybasis_3
+store 58
+global GroupSize
+int 2
+==
+txn Sender
+load 51
+txnas Accounts
+load 49
+txnas Assets
+itob
+app_local_get
+callsub offeredauth_5
+==
+&&
+load 54
+gtxns RekeyTo
+global ZeroAddress
+==
+&&
+load 54
+gtxns Sender
+load 51
+txnas Accounts
+load 49
+txnas Assets
+itob
+app_local_get
+callsub offeredauth_5
+==
+&&
+load 50
+load 51
+txnas Accounts
+load 49
+txnas Assets
+itob
+app_local_get
+callsub offeredamount_4
+<=
+&&
+load 54
+gtxns TypeEnum
+int axfer
+==
+load 54
+gtxns AssetCloseTo
+global ZeroAddress
+==
+&&
+load 54
+gtxns AssetReceiver
+global CurrentApplicationAddress
+==
+&&
+load 54
+gtxns TypeEnum
+int pay
+==
+load 54
+gtxns CloseRemainderTo
+global ZeroAddress
+==
+&&
+load 54
+gtxns Receiver
+global CurrentApplicationAddress
+==
+&&
+||
+&&
+load 53
+txnas Accounts
+load 57
+==
+&&
+assert
+load 54
+gtxns TypeEnum
+int axfer
+==
+bnz transfer_14_l2
+load 54
+gtxns Amount
+load 51
+txnas Accounts
+load 53
+txnas Accounts
+load 58
+callsub payalgos_7
+b transfer_14_l3
+transfer_14_l2:
+load 54
+gtxns XferAsset
+load 54
+gtxns AssetAmount
+load 51
+txnas Accounts
+load 53
+txnas Accounts
+load 58
+callsub payassets_6
+transfer_14_l3:
+load 49
+txnas Assets
+load 51
+txnas Accounts
+load 52
+txnas Accounts
+load 49
+txnas Assets
+callsub moveasset_9
+load 51
+txnas Accounts
+load 49
+txnas Assets
+itob
+load 51
+txnas Accounts
+load 49
+txnas Assets
+itob
+app_local_get
+callsub offeredauth_5
+load 51
+txnas Accounts
+load 49
+txnas Assets
+itob
+app_local_get
+callsub offeredamount_4
+load 50
+-
+txn Sender
+load 56
+callsub updateoffered_10
+retsub
+
+// offer
+offer_15:
+store 86
+store 85
+store 84
+store 83
+store 82
+load 82
+txnas Assets
+asset_params_get AssetClawback
+store 88
+store 87
+txn Sender
+load 82
+txnas Assets
+asset_holding_get AssetBalance
+store 89
+load 83
+>=
+assert
+load 88
+load 87
+global CurrentApplicationAddress
+==
+&&
+assert
+txn Sender
+load 82
+txnas Assets
+itob
+load 84
+load 82
+txnas Assets
+load 86
+load 85
+callsub updateoffered_10
+retsub
+
+// royalty_free_move
+royaltyfreemove_16:
+store 94
+store 93
+store 92
+store 91
+store 90
+load 92
+txnas Accounts
+load 90
+txnas Assets
+itob
+app_local_get
+callsub offeredamount_4
+store 95
+load 92
+txnas Accounts
+load 90
+txnas Assets
+itob
+app_local_get
+callsub offeredauth_5
+store 96
+load 95
+load 94
+==
+assert
+load 96
+txn Sender
+==
+assert
+load 96
+callsub getadmin_0
+==
+assert
+load 95
+load 91
+>=
+assert
+load 92
+txnas Accounts
+load 90
+txnas Assets
+itob
+byte ""
+int 0
+txn Sender
+load 94
+callsub updateoffered_10
+load 90
+txnas Assets
+load 92
+txnas Accounts
+load 93
+txnas Accounts
+load 91
+callsub moveasset_9
+retsub
+
+// get_offer
+getoffer_17:
+store 26
+store 25
+load 26
+txnas Accounts
+int 0
+load 25
+itob
+app_local_get_ex
+store 28
+store 27
+load 28
+assert
+load 27
+retsub
+
+// get_policy
+getpolicy_18:
+callsub royaltyreceiver_2
+store 30
+callsub royaltybasis_3
+store 31
+load 30
+load 31
+itob
+concat
+retsub
+
+// get_administrator
+getadministrator_19:
+callsub getadmin_0
+retsub

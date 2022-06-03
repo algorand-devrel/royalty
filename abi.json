@@ -1,0 +1,97 @@
+{
+  "name": "royalty-example",
+  "methods": [
+    {
+      "name": "set_administrator",
+      "args": [
+        {
+          "type": "address"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      }
+    },
+    {
+      "name": "set_policy",
+      "args": [
+        {
+          "type": "uint64"
+        },
+        {
+          "type": "address"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      }
+    },
+    {
+      "name": "set_asset",
+      "args": [
+        {
+          "type": "asset"
+        },
+        {
+          "type": "bool"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      }
+    },
+    {
+      "name": "royalty_free_move",
+      "args": [
+        {
+          "type": "asset"
+        },
+        {
+          "type": "uint64"
+        },
+        {
+          "type": "account"
+        },
+        {
+          "type": "account"
+        },
+        {
+          "type": "uint64"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      }
+    },
+    {
+      "name": "get_offer",
+      "args": [
+        {
+          "type": "uint64"
+        },
+        {
+          "type": "account"
+        }
+      ],
+      "returns": {
+        "type": "(address,uint64)"
+      }
+    },
+    {
+      "name": "get_policy",
+      "args": [],
+      "returns": {
+        "type": "(address,uint64)"
+      }
+    },
+    {
+      "name": "get_administrator",
+      "args": [],
+      "returns": {
+        "type": "address"
+      }
+    }
+  ],
+  "desc": null,
+  "networks": {}
+}

@@ -10,6 +10,24 @@ r_recv_key = Bytes("royalty_receiver")
 basis_point_multiplier = 100 * 100
 
 
+Offer = abi.Tuple2[abi.Address, abi.Uint64]
+Policy = abi.Tuple2[abi.Address, abi.Uint64]
+
+
+
+@Subroutine(TealType.bytes)
+def get_admin():
+    return Seq(
+        (admin := App.globalGetEx(Int(0), administrator_key)),
+        If(admin.hasValue(), admin.value(), Global.creator_address()),
+    )
+
+
+@Subroutine(TealType.none)
+def put_admin(admin: Expr):
+    return App.globalPut(administrator_key, admin)
+
+
 @Subroutine(TealType.bytes)
 def royalty_receiver():
     return App.globalGet(r_recv_key)
@@ -19,12 +37,6 @@ def royalty_receiver():
 def royalty_basis():
     return App.globalGet(r_basis_key)
 
-@Subroutine(TealType.bytes)
-def administrator():
-    return Seq(
-        (admin := App.globalGetEx(Int(0), administrator_key)),
-        If(admin.hasValue(), admin.value(), Global.creator_address())
-    )
 
 @Subroutine(TealType.uint64)
 def offered_amount(offer):
@@ -34,255 +46,6 @@ def offered_amount(offer):
 @Subroutine(TealType.bytes)
 def offered_auth(offer):
     return Extract(offer, Int(0), Int(32))
-
-
-set_administrator_selector = MethodSignature("set_administrator(address)void")
-
-@Subroutine(TealType.uint64)
-def set_administrator():
-    return Seq(
-        (new_admin := abi.Address()).decode(Txn.application_args[1]),
-        put_administrator(new_admin.encode()),
-    )
-
-set_policy_selector = MethodSignature("set_policy(uint64,address)void")
-
-
-@Subroutine(TealType.uint64)
-def set_policy():
-    return Seq(
-        (r_basis := abi.Uint64()).decode(Txn.application_args[1]),
-        (r_recv := abi.Address()).decode(Txn.application_args[2]),
-        (r_basis_stored := App.globalGetEx(Int(0), r_basis_key)),
-        (r_recv_stored := App.globalGetEx(Int(0), r_recv_key)),
-        Assert(Not(r_basis_stored.hasValue())),
-        Assert(Not(r_recv_stored.hasValue())),
-        Assert(r_basis.get() <= Int(basis_point_multiplier)),
-        App.globalPut(r_basis_key, r_basis.get()),
-        App.globalPut(r_recv_key, r_recv.get()),
-        Int(1),
-    )
-
-
-set_asset_selector = MethodSignature("set_payment_asset(asset,bool)void")
-
-
-@Subroutine(TealType.uint64)
-def set_asset():
-    asset_id = Txn.assets[Btoi(Txn.application_args[1])]
-    is_allowed = Btoi(Txn.application_args[2])
-
-    return Seq(
-        bal := AssetHolding.balance(Global.current_application_address(), asset_id),
-        creator := AssetParam.creator(asset_id),
-        If(And(is_allowed, Not(bal.hasValue())))
-        .Then(
-            # Opt in to asset
-            Seq(
-                InnerTxnBuilder.Begin(),
-                InnerTxnBuilder.SetFields(
-                    {
-                        TxnField.type_enum: TxnType.AssetTransfer,
-                        TxnField.xfer_asset: asset_id,
-                        TxnField.asset_amount: Int(0),
-                        TxnField.asset_receiver: Global.current_application_address(),
-                    }
-                ),
-                InnerTxnBuilder.Submit(),
-            ),
-        )
-        .ElseIf(And(Not(is_allowed), bal.hasValue()))
-        .Then(
-            # Opt out, close asset to asset creator
-            Seq(
-                InnerTxnBuilder.Begin(),
-                InnerTxnBuilder.SetFields(
-                    {
-                        TxnField.type_enum: TxnType.AssetTransfer,
-                        TxnField.xfer_asset: asset_id,
-                        TxnField.asset_amount: Int(0),
-                        TxnField.asset_close_to: creator.value(),
-                        TxnField.asset_receiver: creator.value(),
-                    }
-                ),
-                InnerTxnBuilder.Submit(),
-            ),
-        ),
-        Int(1),
-    )
-
-
-transfer_selector = MethodSignature(
-    "transfer(asset,uint64,account,account,account,txn,asset,uint64)void"
-)
-
-
-@Subroutine(TealType.uint64)
-def transfer():
-    asset_id = Txn.assets[Btoi(Txn.application_args[1])]
-    asset_amt = Btoi(Txn.application_args[2])
-    owner_acct = Txn.accounts[Btoi(Txn.application_args[3])]
-    buyer_acct = Txn.accounts[Btoi(Txn.application_args[4])]
-    royalty_acct = Txn.accounts[Btoi(Txn.application_args[5])]
-    purchase_txn = Gtxn[Txn.group_index() - Int(1)]
-    # Unusued, just passed in args to let the app have access in foreign assets
-    # asset_idx  = Txn.application_args[6]
-    curr_offered_amt = Btoi(Txn.application_args[7])
-
-    # Get the auth_addr from local state of the owner
-    # If its not present, a 0 is returned and the call fails when we try
-    # to compare to the bytes of Txn.sender
-    offer = App.localGet(owner_acct, Itob(asset_id))
-    offer_auth_addr = offered_auth(offer)
-    offer_amt = offered_amount(offer)
-
-    stored_royalty_recv = ScratchVar(TealType.bytes)
-    stored_royalty_basis = ScratchVar(TealType.uint64)
-
-    valid_transfer_group = And(
-        Global.group_size() == Int(2),
-        # App call sent by authorizing address
-        Txn.sender() == offer_auth_addr,
-        # No funny business
-        purchase_txn.rekey_to() == Global.zero_address(),
-        # payment txn should be from auth
-        purchase_txn.sender() == offer_auth_addr,
-        # transfer amount <= offered amount
-        asset_amt <= offer_amt,
-        # Passed the correct account according to the policy
-        Or(
-            And(
-                purchase_txn.type_enum() == TxnType.AssetTransfer,
-                # Just to be sure
-                purchase_txn.asset_close_to() == Global.zero_address(),
-                # Make sure payments go to the right participants
-                purchase_txn.asset_receiver() == Global.current_application_address(),
-            ),
-            And(
-                purchase_txn.type_enum() == TxnType.Payment,
-                # Just to be sure
-                purchase_txn.close_remainder_to() == Global.zero_address(),
-                # Make sure payments are going to the right participants
-                purchase_txn.receiver() == Global.current_application_address(),
-            ),
-        ),
-        royalty_acct == stored_royalty_recv.load(),
-    )
-
-    return Seq(
-        ## initialize values to check rekey
-        #(owner_auth := AccountParam.authAddr(owner_acct)),
-        #(buyer_auth := AccountParam.authAddr(buyer_acct)),
-        ## Make sure neither owner/buyer have been rekeyed (OPTIONAL)
-        #Assert(owner_auth.value() == Global.zero_address()),
-        #Assert(buyer_auth.value() == Global.zero_address()),
-        # Grab the royalty policy settings
-        stored_royalty_recv.store(royalty_receiver()),
-        stored_royalty_basis.store(royalty_basis()),
-        # Make sure transactions look right
-        Assert(valid_transfer_group),
-        # Make royalty payment
-        If(
-            purchase_txn.type_enum() == TxnType.AssetTransfer,
-            pay_assets(
-                purchase_txn.xfer_asset(),
-                purchase_txn.asset_amount(),
-                owner_acct,
-                royalty_acct,
-                stored_royalty_basis.load(),
-            ),
-            pay_algos(
-                purchase_txn.amount(),
-                owner_acct,
-                royalty_acct,
-                stored_royalty_basis.load(),
-            ),
-        ),
-        # Perform asset move
-        move_asset(asset_id, owner_acct, buyer_acct, asset_amt),
-        # Clear listing from local state of owner
-        update_offered(
-            owner_acct,
-            Itob(asset_id),
-            offer_auth_addr,
-            offer_amt - asset_amt,
-            Txn.sender(),
-            curr_offered_amt,
-        ),
-        Int(1),
-    )
-
-
-offer_selector = MethodSignature("offer(asset,uint64,address,uint64,address)void")
-
-
-@Subroutine(TealType.uint64)
-def offer():
-    asset_id = Txn.assets[Btoi(Txn.application_args[1])]
-    asset_amt = Btoi(Txn.application_args[2])
-
-    auth_acct = Txn.application_args[3]
-    prev_amt = Btoi(Txn.application_args[4])
-
-    prev_auth = Txn.application_args[5]
-
-    return Seq(
-        cb := AssetParam.clawback(asset_id),
-        bal := AssetHolding.balance(Txn.sender(), asset_id),
-        # Check that caller _has_ this asset
-        Assert(bal.value() >= asset_amt),
-        # Check that this app is the clawback for it
-        Assert(And(cb.hasValue(), cb.value() == Global.current_application_address())),
-        # Set the auth addr for this asset
-        update_offered(
-            Txn.sender(), Itob(asset_id), auth_acct, asset_amt, prev_auth, prev_amt
-        ),
-        Int(1),
-    )
-
-
-royalty_free_move_selector = MethodSignature(
-    "royalty_free_move(asset,uint64,account,account,uint64)void"
-)
-
-
-@Subroutine(TealType.uint64)
-def royalty_free_move():
-    asset_id = Txn.assets[Btoi(Txn.application_args[1])]
-    asset_amt = Btoi(Txn.application_args[2])
-
-    from_acct = Txn.accounts[Btoi(Txn.application_args[3])]
-    to_acct = Txn.accounts[Btoi(Txn.application_args[4])]
-
-    prev_offered_amt = Btoi(Txn.application_args[5])
-    prev_offered_auth = Txn.sender()
-
-    offer = App.localGet(from_acct, Itob(asset_id))
-
-    curr_offer_amt = ScratchVar()
-    curr_offer_auth = ScratchVar()
-    return Seq(
-        curr_offer_amt.store(offered_amount(offer)),
-        curr_offer_auth.store(offered_auth(offer)),
-        # Must match what is currently offered
-        Assert(curr_offer_amt.load() == prev_offered_amt),
-        Assert(curr_offer_auth.load() == prev_offered_auth),
-        # Must be set to app creator and less than the amount to move
-        Assert(curr_offer_auth.load() == administrator()),
-        Assert(curr_offer_amt.load() <= asset_amt),
-        # Delete the offer
-        update_offered(
-            from_acct,
-            Itob(asset_id),
-            Bytes(""),
-            Int(0),
-            prev_offered_auth,
-            prev_offered_amt,
-        ),
-        # Move it
-        move_asset(asset_id, from_acct, to_acct, asset_amt),
-        Int(1),
-    )
 
 
 @Subroutine(TealType.none)
@@ -394,112 +157,276 @@ def update_offered(acct, asset, auth, amt, prev_auth, prev_amt):
     )
 
 
-@Subroutine(TealType.uint64)
-def put_administrator(admin: Expr):
+
+
+
+
+from_administrator = Txn.sender() == get_admin()
+
+router = Router(
+    "demo-arc-18",
+    BareCallActions(
+        no_op=OnCompleteAction.create_only(Seq(put_admin(Txn.sender()), Approve())),
+        delete_application=OnCompleteAction.always(Return(from_administrator)),
+        update_application=OnCompleteAction.always(Return(from_administrator)),
+        opt_in=OnCompleteAction.always(Approve()),
+        close_out=OnCompleteAction.always(Approve()),
+        clear_state=OnCompleteAction.always(Approve())
+    )
+)
+
+
+@router.method
+def set_administrator(new_admin: abi.Address):
     return Seq(
-        App.globalPut(administrator_key, admin),
-        Int(1)
+        Assert(from_administrator),
+        put_admin(new_admin.get()),
     )
 
 
-get_offer_selector = MethodSignature("get_offer(uint64,account)(address,uint64)")
+@router.method
+def set_policy(r_basis: abi.Uint64, r_recv: abi.Address):
+    return Seq(
+        Assert(from_administrator),
+        (r_basis_stored := App.globalGetEx(Int(0), r_basis_key)),
+        (r_recv_stored := App.globalGetEx(Int(0), r_recv_key)),
+        Assert(Not(r_basis_stored.hasValue())),
+        Assert(Not(r_recv_stored.hasValue())),
+        Assert(r_basis.get() <= Int(basis_point_multiplier)),
+        App.globalPut(r_basis_key, r_basis.get()),
+        App.globalPut(r_recv_key, r_recv.get()),
+    )
 
 
-@Subroutine(TealType.uint64)
-def get_offer():
-    offered_asset = Txn.application_args[1]
-    offering_acct = Txn.accounts[Btoi(Txn.application_args[2])]
+@router.method
+def set_asset(asset: abi.Asset, is_allowed: abi.Bool):
+    return Seq(
+        Assert(from_administrator),
+        bal := AssetHolding.balance(Global.current_application_address(), asset.get()),
+        creator := AssetParam.creator(asset.get()),
+        If(And(is_allowed.get(), Not(bal.hasValue())))
+        .Then(
+            # Opt in to asset
+            Seq(
+                InnerTxnBuilder.Begin(),
+                InnerTxnBuilder.SetFields(
+                    {
+                        TxnField.type_enum: TxnType.AssetTransfer,
+                        TxnField.xfer_asset: asset.get(),
+                        TxnField.asset_amount: Int(0),
+                        TxnField.asset_receiver: Global.current_application_address(),
+                    }
+                ),
+                InnerTxnBuilder.Submit(),
+            ),
+        )
+        .ElseIf(And(Not(is_allowed.get()), bal.hasValue()))
+        .Then(
+            # Opt out, close asset to asset creator
+            Seq(
+                InnerTxnBuilder.Begin(),
+                InnerTxnBuilder.SetFields(
+                    {
+                        TxnField.type_enum: TxnType.AssetTransfer,
+                        TxnField.xfer_asset: asset.get(),
+                        TxnField.asset_amount: Int(0),
+                        TxnField.asset_close_to: creator.value(),
+                        TxnField.asset_receiver: creator.value(),
+                    }
+                ),
+                InnerTxnBuilder.Submit(),
+            ),
+        ),
+    )
+
+
+@router.method
+def transfer(
+    asset: abi.Asset,
+    amt: abi.Uint64,
+    owner: abi.Account,
+    buyer: abi.Account,
+    royalty_acct: abi.Account,
+    purchase_txn: abi.Transaction,
+    purchase_asset: abi.Asset,
+    offered_amt: abi.Uint64,
+):
+    # Get the auth_addr from local state of the owner
+    # If its not present, a 0 is returned and the call fails when we try
+    # to compare to the bytes of Txn.sender
+    offer = App.localGet(owner.get(), Itob(asset.get()))
+    offer_auth_addr = offered_auth(offer)
+    offer_amt = offered_amount(offer)
+
+    stored_royalty_recv = ScratchVar(TealType.bytes)
+    stored_royalty_basis = ScratchVar(TealType.uint64)
+
+    valid_transfer_group = And(
+        Global.group_size() == Int(2),
+        # App call sent by authorizing address
+        Txn.sender() == offer_auth_addr,
+        # No funny business
+        purchase_txn.get().rekey_to() == Global.zero_address(),
+        # payment txn should be from auth
+        purchase_txn.get().sender() == offer_auth_addr,
+        # transfer amount <= offered amount
+        amt.get() <= offer_amt,
+        # Passed the correct account according to the policy
+        Or(
+            And(
+                purchase_txn.get().type_enum() == TxnType.AssetTransfer,
+                # Just to be sure
+                purchase_txn.get().asset_close_to() == Global.zero_address(),
+                # Make sure payments go to the right participants
+                purchase_txn.get().asset_receiver()
+                == Global.current_application_address(),
+            ),
+            And(
+                purchase_txn.get().type_enum() == TxnType.Payment,
+                # Just to be sure
+                purchase_txn.get().close_remainder_to() == Global.zero_address(),
+                # Make sure payments are going to the right participants
+                purchase_txn.get().receiver() == Global.current_application_address(),
+            ),
+        ),
+        royalty_acct.get() == stored_royalty_recv.load(),
+    )
 
     return Seq(
-        stored_offer := App.localGetEx(offering_acct, Int(0), offered_asset),
+        # Grab the royalty policy settings
+        stored_royalty_recv.store(royalty_receiver()),
+        stored_royalty_basis.store(royalty_basis()),
+        # Make sure transactions look right
+        Assert(valid_transfer_group),
+        # Make royalty payment
+        If(
+            purchase_txn.get().type_enum() == TxnType.AssetTransfer,
+            pay_assets(
+                purchase_txn.get().xfer_asset(),
+                purchase_txn.get().asset_amount(),
+                owner.get(),
+                royalty_acct.get(),
+                stored_royalty_basis.load(),
+            ),
+            pay_algos(
+                purchase_txn.get().amount(),
+                owner.get(),
+                royalty_acct.get(),
+                stored_royalty_basis.load(),
+            ),
+        ),
+        # Perform asset move
+        move_asset(asset.get(), owner.get(), buyer.get(), asset.get()),
+        # Clear listing from local state of owner
+        update_offered(
+            owner.get(),
+            Itob(asset.get()),
+            offer_auth_addr,
+            offer_amt - amt.get(),
+            Txn.sender(),
+            offered_amt.get(),
+        ),
+    )
+
+
+@router.method
+def offer(
+    asset: abi.Asset,
+    amt: abi.Uint64,
+    auth: abi.Address,
+    prev_amt: abi.Uint64,
+    prev_auth: abi.Address,
+):
+    return Seq(
+        cb := AssetParam.clawback(asset.get()),
+        bal := AssetHolding.balance(Txn.sender(), asset.get()),
+        # Check that caller _has_ this asset
+        Assert(bal.value() >= amt.get()),
+        # Check that this app is the clawback for it
+        Assert(And(cb.hasValue(), cb.value() == Global.current_application_address())),
+        # Set the auth addr for this asset
+        update_offered(
+            Txn.sender(),
+            Itob(asset.get()),
+            auth.get(),
+            asset.get(),
+            prev_auth.get(),
+            prev_amt.get(),
+        ),
+    )
+
+
+@router.method
+def royalty_free_move(asset: abi.Asset, amt: abi.Uint64, from_acct: abi.Account, to_acct: abi.Account, offered_amt: abi.Uint64):
+    prev_offered_auth = Txn.sender()
+
+    offer = App.localGet(from_acct.get(), Itob(asset.get()))
+
+    return Seq(
+        (curr_offer_amt := ScratchVar()).store(offered_amount(offer)),
+        (curr_offer_auth := ScratchVar()).store(offered_auth(offer)),
+        # Must match what is currently offered
+        Assert(curr_offer_amt.load() == offered_amt.get()),
+        Assert(curr_offer_auth.load() == prev_offered_auth),
+        # Must be set to app creator and less than the amount to move
+        Assert(curr_offer_auth.load() == get_admin()),
+        Assert(curr_offer_amt.load() >= amt.get()),
+        # Delete the offer
+        update_offered(
+            from_acct.get(),
+            Itob(asset.get()),
+            Bytes(""),
+            Int(0),
+            prev_offered_auth,
+            offered_amt.get(),
+        ),
+        # Move it
+        move_asset(asset.get(), from_acct.get(), to_acct.get(), amt.get()),
+    )
+
+
+
+@router.method
+def get_offer(asset_id: abi.Uint64, acct: abi.Account, *, output: Offer):
+    return Seq(
+        stored_offer := App.localGetEx(acct.get(), Int(0), Itob(asset_id.get())),
         Assert(stored_offer.hasValue()),
-        (addr := abi.Address()).decode(offered_auth(stored_offer.value())),
-        (amt := abi.Uint64()).set(offered_amount(stored_offer.value())),
-        (ret := abi.Tuple(abi.TupleTypeSpec(abi.AddressTypeSpec(), abi.Uint64TypeSpec()))).set(addr, amt),
-        abi.MethodReturn(ret),
-        Int(1),
+        output.decode(stored_offer.value())
     )
 
-
-get_policy_selector = MethodSignature("get_policy()(address,uint64)")
-
-
-@Subroutine(TealType.uint64)
-def get_policy():
+@router.method
+def get_policy(*, output: Policy):
     return Seq(
         (addr := abi.Address()).decode(royalty_receiver()),
         (amt := abi.Uint64()).set(royalty_basis()),
-        (ret := abi.Tuple(abi.TupleTypeSpec(abi.AddressTypeSpec(), abi.Uint64TypeSpec()))).set(addr, amt),
-        abi.MethodReturn(ret),
-        Int(1),
+        output.set(addr, amt)
     )
 
-get_administrator_selector = MethodSignature("get_administrator()address")
-
-@Subroutine(TealType.uint64)
-def get_administrator():
-    return Seq(
-        (admin := abi.Address()).decode(administrator()),
-        abi.MethodReturn(admin),
-        Int(1)
-    )
+@router.method
+def get_administrator(*, output: abi.Address):
+    return output.decode(get_admin())
 
 
-def approval():
-    from_administrator = Txn.sender() == administrator() 
-
-
-
-    action_router = Cond(
-        [
-            And(Txn.application_args[0] == royalty_free_move_selector, from_administrator),
-            royalty_free_move(),
-        ],
-        [
-            And(Txn.application_args[0] == set_policy_selector, from_administrator),
-            set_policy(),
-        ],
-        [
-            And(Txn.application_args[0] == set_asset_selector, from_administrator),
-            set_asset(),
-        ],
-        [
-            And(Txn.application_args[0] == set_administrator_selector, from_administrator),
-            set_administrator(),
-        ],
-        [Txn.application_args[0] == transfer_selector, transfer()],
-        [Txn.application_args[0] == offer_selector, offer()],
-        [Txn.application_args[0] == get_offer_selector, get_offer()],
-        [Txn.application_args[0] == get_policy_selector, get_policy()],
-        [Txn.application_args[0] == get_administrator_selector, get_administrator()],
-    )
-
-    return Cond(
-        [Txn.application_id() == Int(0), Return(put_administrator(Txn.sender()))],
-        [Txn.on_completion() == OnComplete.DeleteApplication, Return(from_administrator)],
-        [Txn.on_completion() == OnComplete.UpdateApplication, Return(from_administrator)],
-        [Txn.on_completion() == OnComplete.OptIn, Approve()],
-        [Txn.on_completion() == OnComplete.CloseOut, Approve()],
-        [Txn.on_completion() == OnComplete.NoOp, Return(action_router)],
-    )
-
-
-def clear():
-    return Approve()
-
+approval, clear, contract = router.compile_program(
+        version=6, optimize=OptimizeOptions(scratch_slots=True),
+)
 
 def get_approval():
-    return compileTeal(
-        approval(),
-        mode=Mode.Application,
-        version=6,
-        optimize=OptimizeOptions(scratch_slots=True),
-    )
+    return approval
 
 
 def get_clear():
-    return compileTeal(clear(), mode=Mode.Application, version=6)
+    return clear
 
 
 if __name__ == "__main__":
-    print(get_approval())
+    import json
+
+    with open("abi.json", "w") as f:
+        f.write(json.dumps(contract.dictify(), indent=4))
+
+    with open("approval.teal", "w") as f:
+        f.write(approval)
+
+    with open("clear.teal", "w") as f:
+        f.write(clear)

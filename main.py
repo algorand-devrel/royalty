@@ -133,7 +133,7 @@ def main():
         sp,
         addr_signer,
     )
-    #TODO: really should just dryrun this 
+    # TODO: really should just dryrun this
     results = atc.execute(client, 2)
     print("Current admin: {}".format(results.abi_results[0].return_value))
 
@@ -160,7 +160,7 @@ def main():
         sp,
         addr_signer,
     )
-    #TODO: really should just dryrun this 
+    # TODO: really should just dryrun this
     results = atc.execute(client, 2)
     print("Current admin: {}".format(results.abi_results[0].return_value))
 
@@ -176,10 +176,6 @@ def main():
         method_args=[addr],
     )
     atc.execute(client, 2)
-
-
-
-
 
     #################
     # Set the royalty policy

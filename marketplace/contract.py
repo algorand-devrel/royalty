@@ -25,23 +25,13 @@ def list_nft():
         app_addr := AppParam.address(app_id),
         offered := App.localGetEx(Txn.sender(), app_id, Itob(asset_id)),
         # Check stuff
-        Assert(
-            And(
-                # We don't have anything there yet
-                App.globalGet(app_key) == Int(0),
-                # The app call to trigger offered is present and same as app id
-                offer_txn.application_id() == app_id,
-                # The caller has the asset
-                asset_balance.value() > Int(0),
-                # The freeze/clawback are set to app addr
-                asset_freeze.value() == app_addr.value(),
-                asset_clawback.value() == app_addr.value(),
-                # The authorized addr for this asset is this apps account
-                Extract(offered.value(), Int(0), Int(32))
-                == Global.current_application_address(),
-                ExtractUint64(offered.value(), Int(32)) <= asset_amount,
-            )
-        ),
+        Assert(App.globalGet(app_key) == Int(0)), # We don't have anything there yet
+        Assert(offer_txn.application_id() == app_id), # The app call to trigger offered is present and same as app id
+        Assert(asset_balance.value() > Int(0)), # The caller has the asset
+        Assert(asset_freeze.value() == app_addr.value()), # The freeze/clawback are set to app addr
+        Assert(asset_clawback.value() == app_addr.value()), # The authorized addr for this asset is this apps account
+        Assert(Extract(offered.value(), Int(0), Int(32)) == Global.current_application_address()),
+        Assert(ExtractUint64(offered.value(), Int(32)) >= asset_amount),
         # Set appropriate parameters
         App.globalPut(app_key, app_id),
         App.globalPut(asset_key, asset_id),
@@ -72,19 +62,14 @@ def buy_nft():
     # Issue inner app call to royalty to move asset
     return Seq(
         current_offer := App.localGetEx(owner_acct, app_id, Itob(asset_id)),
-        Assert(
-            And(
-                # Matches what we have in global state
-                owner_acct == App.globalGet(account_key),
-                app_id == App.globalGet(app_key),
-                asset_id == App.globalGet(asset_key),
-                pay_txn.amount() >= App.globalGet(price_key),
-                asset_amount <= App.globalGet(amount_key),
-                # Pay me plz
-                pay_txn.receiver() == Global.current_application_address(),
-                current_offer.hasValue(),
-            )
-        ),
+        # Matches what we have in global state
+        Assert(owner_acct == App.globalGet(account_key)),
+        Assert(app_id == App.globalGet(app_key)),
+        Assert(asset_id == App.globalGet(asset_key)),
+        Assert(pay_txn.amount() >= App.globalGet(price_key)),
+        Assert(asset_amount <= App.globalGet(amount_key)),
+        Assert(pay_txn.receiver() == Global.current_application_address()),
+        Assert(current_offer.hasValue()),
         InnerTxnBuilder.Begin(),
         InnerTxnBuilder.SetFields(
             {
@@ -104,10 +89,10 @@ def buy_nft():
                     ),
                     Itob(Int(0)),  # Royalty Asset in 0th position of asset array
                     Itob(asset_amount),  # The number of units being purchased
-                    Itob(Int(1)),  # Current owner first element here but offset by 1
-                    Itob(Int(2)),  # Buyer
-                    Itob(Int(3)),  # Who we need to pay for royalties
-                    Itob(Int(0)),  # Asset idx of 0, should be ignored
+                    Suffix(Itob(Int(1)), Int(7)),  # Current owner first element here but offset by 1
+                    Suffix(Itob(Int(2)), Int(7)),  # Buyer
+                    Suffix(Itob(Int(3)), Int(7)),  # Who we need to pay for royalties
+                    Suffix(Itob(Int(0)), Int(7)),  # Asset idx of 0, should be ignored
                     Itob(
                         offered_amount(current_offer.value())
                     ),  # Current offered amount
