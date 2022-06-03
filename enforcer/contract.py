@@ -270,6 +270,7 @@ def transfer(
         Or(
             And(
                 purchase_txn.get().type_enum() == TxnType.AssetTransfer,
+                purchase_txn.get().xfer_asset() == purchase_asset.get(),
                 # Just to be sure
                 purchase_txn.get().asset_close_to() == Global.zero_address(),
                 # Make sure payments go to the right participants
@@ -311,7 +312,7 @@ def transfer(
             ),
         ),
         # Perform asset move
-        move_asset(asset.get(), owner.get(), buyer.get(), asset.get()),
+        move_asset(asset.get(), owner.get(), buyer.get(), amt.get()),
         # Clear listing from local state of owner
         update_offered(
             owner.get(),
@@ -344,7 +345,7 @@ def offer(
             Txn.sender(),
             Itob(asset.get()),
             auth.get(),
-            asset.get(),
+            amt.get(),
             prev_auth.get(),
             prev_amt.get(),
         ),
@@ -359,27 +360,25 @@ def royalty_free_move(
     to_acct: abi.Account,
     offered_amt: abi.Uint64,
 ):
-    prev_offered_auth = Txn.sender()
 
     offer = App.localGet(from_acct.get(), Itob(asset.get()))
 
     return Seq(
         (curr_offer_amt := ScratchVar()).store(offered_amount(offer)),
         (curr_offer_auth := ScratchVar()).store(offered_auth(offer)),
-        # Must match what is currently offered
+        # Must match what is currently offered and amt to move is less than 
+        # or equal to what has been offered
         Assert(curr_offer_amt.load() == offered_amt.get()),
-        Assert(curr_offer_auth.load() == prev_offered_auth),
-        # Must be set to app creator and less than the amount to move
-        Assert(curr_offer_auth.load() == get_admin()),
         Assert(curr_offer_amt.load() >= amt.get()),
+        Assert(curr_offer_auth.load() == Txn.sender()),
         # Delete the offer
         update_offered(
             from_acct.get(),
             Itob(asset.get()),
             Bytes(""),
             Int(0),
-            prev_offered_auth,
-            offered_amt.get(),
+            curr_offer_auth.load(),
+            curr_offer_amt.load(),
         ),
         # Move it
         move_asset(asset.get(), from_acct.get(), to_acct.get(), amt.get()),
