@@ -14,7 +14,6 @@ Offer = abi.Tuple2[abi.Address, abi.Uint64]
 Policy = abi.Tuple2[abi.Address, abi.Uint64]
 
 
-
 @Subroutine(TealType.bytes)
 def get_admin():
     return Seq(
@@ -157,10 +156,6 @@ def update_offered(acct, asset, auth, amt, prev_auth, prev_amt):
     )
 
 
-
-
-
-
 from_administrator = Txn.sender() == get_admin()
 
 router = Router(
@@ -171,8 +166,8 @@ router = Router(
         update_application=OnCompleteAction.always(Return(from_administrator)),
         opt_in=OnCompleteAction.always(Approve()),
         close_out=OnCompleteAction.always(Approve()),
-        clear_state=OnCompleteAction.always(Approve())
-    )
+        clear_state=OnCompleteAction.always(Approve()),
+    ),
 )
 
 
@@ -357,7 +352,13 @@ def offer(
 
 
 @router.method
-def royalty_free_move(asset: abi.Asset, amt: abi.Uint64, from_acct: abi.Account, to_acct: abi.Account, offered_amt: abi.Uint64):
+def royalty_free_move(
+    asset: abi.Asset,
+    amt: abi.Uint64,
+    from_acct: abi.Account,
+    to_acct: abi.Account,
+    offered_amt: abi.Uint64,
+):
     prev_offered_auth = Txn.sender()
 
     offer = App.localGet(from_acct.get(), Itob(asset.get()))
@@ -385,22 +386,23 @@ def royalty_free_move(asset: abi.Asset, amt: abi.Uint64, from_acct: abi.Account,
     )
 
 
-
 @router.method
 def get_offer(asset_id: abi.Uint64, acct: abi.Account, *, output: Offer):
     return Seq(
         stored_offer := App.localGetEx(acct.get(), Int(0), Itob(asset_id.get())),
         Assert(stored_offer.hasValue()),
-        output.decode(stored_offer.value())
+        output.decode(stored_offer.value()),
     )
+
 
 @router.method
 def get_policy(*, output: Policy):
     return Seq(
         (addr := abi.Address()).decode(royalty_receiver()),
         (amt := abi.Uint64()).set(royalty_basis()),
-        output.set(addr, amt)
+        output.set(addr, amt),
     )
+
 
 @router.method
 def get_administrator(*, output: abi.Address):
@@ -408,8 +410,10 @@ def get_administrator(*, output: abi.Address):
 
 
 approval, clear, contract = router.compile_program(
-        version=6, optimize=OptimizeOptions(scratch_slots=True),
+    version=6,
+    optimize=OptimizeOptions(scratch_slots=True),
 )
+
 
 def get_approval():
     return approval

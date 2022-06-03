@@ -71,8 +71,8 @@ def main():
         client,
         addr,
         pk,
-        enforcer.get_approval,
-        enforcer.get_clear,
+        enforcer.get_approval(),
+        enforcer.get_clear(),
         global_schema=StateSchema(1, 2),
         local_schema=StateSchema(0, 16),
     )
@@ -230,8 +230,8 @@ def main():
         client,
         addr,
         pk,
-        marketplace.get_approval,
-        marketplace.get_clear,
+        marketplace.get_approval(),
+        marketplace.get_clear(),
         global_schema=StateSchema(4, 1),
         local_schema=StateSchema(0, 16),
     )
