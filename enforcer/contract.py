@@ -249,7 +249,7 @@ def transfer(
     # Get the auth_addr from local state of the owner
     # If its not present, a 0 is returned and the call fails when we try
     # to compare to the bytes of Txn.sender
-    offer = App.localGet(owner.get(), Itob(asset.get()))
+    offer = App.localGet(owner.get(), Itob(asset.deref()))
     offer_auth_addr = offered_auth(offer)
     offer_amt = offered_amount(offer)
 
@@ -270,7 +270,7 @@ def transfer(
         Or(
             And(
                 purchase_txn.get().type_enum() == TxnType.AssetTransfer,
-                purchase_txn.get().xfer_asset() == purchase_asset.get(),
+                purchase_txn.get().xfer_asset() == purchase_asset.deref(),
                 # Just to be sure
                 purchase_txn.get().asset_close_to() == Global.zero_address(),
                 # Make sure payments go to the right participants
@@ -285,7 +285,7 @@ def transfer(
                 purchase_txn.get().receiver() == Global.current_application_address(),
             ),
         ),
-        royalty_acct.get() == stored_royalty_recv.load(),
+        royalty_acct.deref() == stored_royalty_recv.load(),
     )
 
     return Seq(
@@ -300,23 +300,23 @@ def transfer(
             pay_assets(
                 purchase_txn.get().xfer_asset(),
                 purchase_txn.get().asset_amount(),
-                owner.get(),
-                royalty_acct.get(),
+                owner.deref(),
+                royalty_acct.deref(),
                 stored_royalty_basis.load(),
             ),
             pay_algos(
                 purchase_txn.get().amount(),
-                owner.get(),
-                royalty_acct.get(),
+                owner.deref(),
+                royalty_acct.deref(),
                 stored_royalty_basis.load(),
             ),
         ),
         # Perform asset move
-        move_asset(asset.get(), owner.get(), buyer.get(), amt.get()),
+        move_asset(asset.deref(), owner.deref(), buyer.deref(), amt.get()),
         # Clear listing from local state of owner
         update_offered(
             owner.get(),
-            Itob(asset.get()),
+            Itob(asset.deref()),
             offer_auth_addr,
             offer_amt - amt.get(),
             Txn.sender(),
@@ -343,7 +343,7 @@ def offer(
         # Set the auth addr for this asset
         update_offered(
             Txn.sender(),
-            Itob(asset.get()),
+            Itob(asset.deref()),
             auth.get(),
             amt.get(),
             prev_auth.get(),
@@ -361,7 +361,7 @@ def royalty_free_move(
     offered_amt: abi.Uint64,
 ):
 
-    offer = App.localGet(from_acct.get(), Itob(asset.get()))
+    offer = App.localGet(from_acct.get(), Itob(asset.deref()))
 
     return Seq(
         (curr_offer_amt := ScratchVar()).store(offered_amount(offer)),
@@ -373,15 +373,15 @@ def royalty_free_move(
         Assert(curr_offer_auth.load() == Txn.sender()),
         # Delete the offer
         update_offered(
-            from_acct.get(),
-            Itob(asset.get()),
+            from_acct.deref(),
+            Itob(asset.deref()),
             Bytes(""),
             Int(0),
             curr_offer_auth.load(),
             curr_offer_amt.load(),
         ),
         # Move it
-        move_asset(asset.get(), from_acct.get(), to_acct.get(), amt.get()),
+        move_asset(asset.deref(), from_acct.deref(), to_acct.deref(), amt.get()),
     )
 
 

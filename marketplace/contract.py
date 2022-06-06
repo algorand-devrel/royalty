@@ -35,11 +35,11 @@ def list(
         asset_freeze := AssetParam.freeze(asset.get()),
         asset_clawback := AssetParam.clawback(asset.get()),
         app_addr := AppParam.address(app.get()),
-        offered := App.localGetEx(Txn.sender(), app.get(), Itob(asset.get())),
+        offered := App.localGetEx(Txn.sender(), app.get(), Itob(asset.deref())),
         # Check stuff
         Assert(App.globalGet(app_key) == Int(0)),  # We don't have anything there yet
         Assert(
-            offer_txn.get().application_id() == app.get()
+            offer_txn.get().application_id() == app.deref()
         ),  # The app call to trigger offered is present and same as app id
         Assert(asset_balance.value() > Int(0)),  # The caller has the asset
         Assert(
@@ -51,8 +51,8 @@ def list(
         Assert(offered_auth(offered.value()) == Global.current_application_address()),
         Assert(offered_amount(offered.value()) >= amt.get()),
         # Set appropriate parameters
-        App.globalPut(app_key, app.get()),
-        App.globalPut(asset_key, asset.get()),
+        App.globalPut(app_key, app.deref()),
+        App.globalPut(asset_key, asset.deref()),
         App.globalPut(amount_key, amt.get()),
         App.globalPut(price_key, price.get()),
         App.globalPut(account_key, Txn.sender()),
@@ -73,12 +73,12 @@ def buy(
     # Make sure the payment is for the right amount
     # Issue inner app call to royalty to move asset
     return Seq(
-        current_offer := App.localGetEx(owner.get(), app.get(), Itob(asset.get())),
+        current_offer := App.localGetEx(owner.get(), app.get(), Itob(asset.deref())),
         # Matches what we have in global state
         Assert(current_offer.hasValue()),
-        Assert(owner.get() == App.globalGet(account_key)),
-        Assert(app.get() == App.globalGet(app_key)),
-        Assert(asset.get() == App.globalGet(asset_key)),
+        Assert(owner.deref() == App.globalGet(account_key)),
+        Assert(app.deref() == App.globalGet(app_key)),
+        Assert(asset.deref() == App.globalGet(asset_key)),
         Assert(pay_txn.get().amount() >= App.globalGet(price_key)),
         Assert(pay_txn.get().receiver() == Global.current_application_address()),
         Assert(amt.get() <= App.globalGet(amount_key)),
@@ -87,14 +87,14 @@ def buy(
             {
                 TxnField.type_enum: TxnType.Payment,
                 TxnField.amount: pay_txn.get().amount(),
-                TxnField.receiver: app_acct.get(),
+                TxnField.receiver: app_acct.deref(),
             }
         ),
         InnerTxnBuilder.Next(),
         InnerTxnBuilder.SetFields(
             {
                 TxnField.type_enum: TxnType.ApplicationCall,
-                TxnField.application_id: app.get(),
+                TxnField.application_id: app.deref(),
                 TxnField.application_args: [
                     MethodSignature(
                         "transfer(asset,uint64,account,account,account,txn,asset,uint64)void"
@@ -111,8 +111,8 @@ def buy(
                         offered_amount(current_offer.value())
                     ),  # Current offered amount
                 ],
-                TxnField.assets: [asset.get()],
-                TxnField.accounts: [owner.get(), Txn.sender(), royalty_acct.get()],
+                TxnField.assets: [asset.deref()],
+                TxnField.accounts: [owner.deref(), Txn.sender(), royalty_acct.deref()],
             }
         ),
         InnerTxnBuilder.Submit(),
