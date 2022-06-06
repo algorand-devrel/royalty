@@ -8,7 +8,7 @@ The enforcement of royalty payments is an important requirement for creators and
 
 ## Running the demo
 
-*Requires Python >= 3.10*
+*Requires Python >= 3.10* AND the `feature/abi` branch of pyteal
 
 Install the [sandbox](https://github.com/algorand/sandbox) and start it in any private network mode (`dev`,`release`,etc..)
 

@@ -17,18 +17,14 @@ client = AlgodClient("a" * 64, "http://localhost:4001")
 
 ZERO_ADDR = encoding.encode_address(bytes(32))
 
-# Read in ABI description from enforcer
-with open("enforcer/abi.json") as f:
-    enforcer_iface = Interface.from_json(f.read())
-
-# Read in ABI description from market
-with open("marketplace/abi.json") as f:
-    marketplace_iface = Interface.from_json(f.read())
+# Get the contracts from the routers we've constructed
+enforcer_contract = enforcer.get_contract() 
+marketplace_contract = marketplace.get_contract() 
 
 
 # Utility method til one is provided
-def get_method(i: Interface, name: str) -> Method:
-    for m in i.methods:
+def get_method(c: Contract, name: str) -> Method:
+    for m in c.methods:
         if m.name == name:
             return m
     raise Exception("No method with the name {}".format(name))
@@ -71,8 +67,8 @@ def main():
         client,
         addr,
         pk,
-        enforcer.get_approval,
-        enforcer.get_clear,
+        enforcer.get_approval(),
+        enforcer.get_clear(),
         global_schema=StateSchema(1, 2),
         local_schema=StateSchema(0, 16),
     )
@@ -128,12 +124,12 @@ def main():
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "get_administrator"),
+        get_method(enforcer_contract, "get_administrator"),
         addr,
         sp,
         addr_signer,
     )
-    #TODO: really should just dryrun this 
+    # TODO: really should just dryrun this
     results = atc.execute(client, 2)
     print("Current admin: {}".format(results.abi_results[0].return_value))
 
@@ -142,7 +138,7 @@ def main():
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "set_administrator"),
+        get_method(enforcer_contract, "set_administrator"),
         addr,
         sp,
         addr_signer,
@@ -155,12 +151,12 @@ def main():
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "get_administrator"),
+        get_method(enforcer_contract, "get_administrator"),
         addr,
         sp,
         addr_signer,
     )
-    #TODO: really should just dryrun this 
+    # TODO: really should just dryrun this
     results = atc.execute(client, 2)
     print("Current admin: {}".format(results.abi_results[0].return_value))
 
@@ -169,17 +165,13 @@ def main():
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "set_administrator"),
+        get_method(enforcer_contract, "set_administrator"),
         buyer_addr,
         sp,
         buyer_signer,
         method_args=[addr],
     )
     atc.execute(client, 2)
-
-
-
-
 
     #################
     # Set the royalty policy
@@ -189,7 +181,7 @@ def main():
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "set_policy"),
+        get_method(enforcer_contract, "set_policy"),
         addr,
         sp,
         addr_signer,
@@ -205,7 +197,7 @@ def main():
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "get_policy"),
+        get_method(enforcer_contract, "get_policy"),
         addr,
         sp,
         addr_signer,
@@ -234,8 +226,8 @@ def main():
         client,
         addr,
         pk,
-        marketplace.get_approval,
-        marketplace.get_clear,
+        marketplace.get_approval(),
+        marketplace.get_clear(),
         global_schema=StateSchema(4, 1),
         local_schema=StateSchema(0, 16),
     )
@@ -260,7 +252,7 @@ def main():
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "offer"),
+        get_method(enforcer_contract, "offer"),
         addr,
         sp,
         addr_signer,
@@ -272,7 +264,7 @@ def main():
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         market_app_id,
-        get_method(marketplace_iface, "list"),
+        get_method(marketplace_contract, "list"),
         addr,
         sp,
         addr_signer,
@@ -289,7 +281,7 @@ def main():
     atc = AtomicTransactionComposer()
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "get_offer"),
+        get_method(enforcer_contract, "get_offer"),
         addr,
         sp,
         addr_signer,
@@ -328,7 +320,7 @@ def main():
     )
     atc.add_method_call(
         market_app_id,
-        get_method(marketplace_iface, "buy"),
+        get_method(marketplace_contract, "buy"),
         buyer_addr,
         sp,
         buyer_signer,
@@ -368,7 +360,7 @@ def main():
     # Offer
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "offer"),
+        get_method(enforcer_contract, "offer"),
         buyer_addr,
         sp,
         buyer_signer,
@@ -377,7 +369,7 @@ def main():
     # Move
     atc.add_method_call(
         app_id,
-        get_method(enforcer_iface, "royalty_free_move"),
+        get_method(enforcer_contract, "royalty_free_move"),
         addr,
         sp,
         addr_signer,

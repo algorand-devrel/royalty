@@ -42,8 +42,8 @@ def create_app(
     client: algod.AlgodClient,
     addr: str,
     pk: str,
-    get_approval,
-    get_clear,
+    approval: str,
+    clear: str,
     global_schema,
     local_schema,
 ) -> int:
@@ -51,11 +51,11 @@ def create_app(
     sp = client.suggested_params()
 
     # Read in approval teal source && compile
-    app_result = client.compile(get_approval())
+    app_result = client.compile(approval)
     app_bytes = base64.b64decode(app_result["result"])
 
     # Read in clear teal source && compile
-    clear_result = client.compile(get_clear())
+    clear_result = client.compile(clear)
     clear_bytes = base64.b64decode(clear_result["result"])
 
     # Create the transaction
