@@ -18,8 +18,8 @@ client = AlgodClient("a" * 64, "http://localhost:4001")
 ZERO_ADDR = encoding.encode_address(bytes(32))
 
 # Get the contracts from the routers we've constructed
-enforcer_contract = enforcer.get_contract() 
-marketplace_contract = marketplace.get_contract() 
+enforcer_contract = enforcer.get_contract()
+marketplace_contract = marketplace.get_contract()
 
 
 # Utility method til one is provided

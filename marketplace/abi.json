@@ -1,0 +1,73 @@
+{
+    "name": "arc-18-marketplace",
+    "methods": [
+        {
+            "name": "list",
+            "args": [
+                {
+                    "type": "asset",
+                    "name": "asset"
+                },
+                {
+                    "type": "application",
+                    "name": "app"
+                },
+                {
+                    "type": "uint64",
+                    "name": "amt"
+                },
+                {
+                    "type": "uint64",
+                    "name": "price"
+                },
+                {
+                    "type": "appl",
+                    "name": "offer_txn"
+                }
+            ],
+            "returns": {
+                "type": "void"
+            },
+            "desc": "list an asset for sale"
+        },
+        {
+            "name": "buy",
+            "args": [
+                {
+                    "type": "asset",
+                    "name": "asset"
+                },
+                {
+                    "type": "application",
+                    "name": "app"
+                },
+                {
+                    "type": "account",
+                    "name": "app_acct"
+                },
+                {
+                    "type": "account",
+                    "name": "owner"
+                },
+                {
+                    "type": "account",
+                    "name": "royalty_acct"
+                },
+                {
+                    "type": "uint64",
+                    "name": "amt"
+                },
+                {
+                    "type": "pay",
+                    "name": "pay_txn"
+                }
+            ],
+            "returns": {
+                "type": "void"
+            },
+            "desc": "Buy a listed asset"
+        }
+    ],
+    "desc": null,
+    "networks": {}
+}

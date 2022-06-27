@@ -1,0 +1,220 @@
+{
+    "name": "demo-arc-18",
+    "methods": [
+        {
+            "name": "set_administrator",
+            "args": [
+                {
+                    "type": "address",
+                    "name": "new_admin"
+                }
+            ],
+            "returns": {
+                "type": "void"
+            },
+            "desc": "Sets the administrator for this royalty enforcer"
+        },
+        {
+            "name": "set_policy",
+            "args": [
+                {
+                    "type": "uint64",
+                    "name": "royalty_basis"
+                },
+                {
+                    "type": "address",
+                    "name": "royalty_receiver"
+                }
+            ],
+            "returns": {
+                "type": "void"
+            },
+            "desc": "Sets the royalty basis and royalty receiver for this royalty enforcer"
+        },
+        {
+            "name": "set_payment_asset",
+            "args": [
+                {
+                    "type": "asset",
+                    "name": "payment_asset"
+                },
+                {
+                    "type": "bool",
+                    "name": "is_allowed"
+                }
+            ],
+            "returns": {
+                "type": "void"
+            },
+            "desc": "Triggers the contract account to opt in or out of an asset that may be used for payment of royalties"
+        },
+        {
+            "name": "transfer",
+            "args": [
+                {
+                    "type": "asset",
+                    "name": "royalty_asset"
+                },
+                {
+                    "type": "uint64",
+                    "name": "royalty_asset_amount"
+                },
+                {
+                    "type": "account",
+                    "name": "owner"
+                },
+                {
+                    "type": "account",
+                    "name": "buyer"
+                },
+                {
+                    "type": "account",
+                    "name": "royalty_receiver"
+                },
+                {
+                    "type": "pay",
+                    "name": "payment_txn"
+                },
+                {
+                    "type": "uint64",
+                    "name": "offered_amt"
+                }
+            ],
+            "returns": {
+                "type": "void"
+            },
+            "desc": "Transfers an Asset from one account to another and enforces royalty payments"
+        },
+        {
+            "name": "transfer",
+            "args": [
+                {
+                    "type": "asset",
+                    "name": "royalty_asset"
+                },
+                {
+                    "type": "uint64",
+                    "name": "royalty_asset_amount"
+                },
+                {
+                    "type": "account",
+                    "name": "owner"
+                },
+                {
+                    "type": "account",
+                    "name": "buyer"
+                },
+                {
+                    "type": "account",
+                    "name": "royalty_receiver"
+                },
+                {
+                    "type": "axfer",
+                    "name": "payment_txn"
+                },
+                {
+                    "type": "asset",
+                    "name": "payment_asset"
+                },
+                {
+                    "type": "uint64",
+                    "name": "offered_amt"
+                }
+            ],
+            "returns": {
+                "type": "void"
+            },
+            "desc": "Transfers an Asset from one account to another and enforces royalty payments"
+        },
+        {
+            "name": "offer",
+            "args": [
+                {
+                    "type": "asset",
+                    "name": "royalty_asset"
+                },
+                {
+                    "type": "uint64",
+                    "name": "royalty_asset_amount"
+                },
+                {
+                    "type": "address",
+                    "name": "auth_address"
+                },
+                {
+                    "type": "uint64",
+                    "name": "prev_offer_amt"
+                },
+                {
+                    "type": "address",
+                    "name": "prev_offer_auth"
+                }
+            ],
+            "returns": {
+                "type": "void"
+            },
+            "desc": "Flags that an asset is offered for sale and sets address authorized to submit the transfer"
+        },
+        {
+            "name": "royalty_free_move",
+            "args": [
+                {
+                    "type": "asset",
+                    "name": "royalty_asset"
+                },
+                {
+                    "type": "uint64",
+                    "name": "royalty_asset_amount"
+                },
+                {
+                    "type": "account",
+                    "name": "owner"
+                },
+                {
+                    "type": "account",
+                    "name": "receiver"
+                },
+                {
+                    "type": "uint64",
+                    "name": "offered_amt"
+                }
+            ],
+            "returns": {
+                "type": "void"
+            },
+            "desc": "Moves the asset passed from one account to another"
+        },
+        {
+            "name": "get_offer",
+            "args": [
+                {
+                    "type": "uint64",
+                    "name": "royalty_asset"
+                },
+                {
+                    "type": "account",
+                    "name": "owner"
+                }
+            ],
+            "returns": {
+                "type": "(address,uint64)"
+            }
+        },
+        {
+            "name": "get_policy",
+            "args": [],
+            "returns": {
+                "type": "(address,uint64)"
+            }
+        },
+        {
+            "name": "get_administrator",
+            "args": [],
+            "returns": {
+                "type": "address"
+            }
+        }
+    ],
+    "desc": null,
+    "networks": {}
+}
