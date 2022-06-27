@@ -569,11 +569,11 @@ load 80
 callsub offeredamount_4
 load 79
 ==
+assert
 load 80
 callsub offeredauth_5
 load 78
 ==
-&&
 assert
 b updateoffered_10_l2
 updateoffered_10_l6:
@@ -700,6 +700,7 @@ store 64
 global GroupSize
 int 2
 ==
+assert
 txn Sender
 load 58
 txnas Accounts
@@ -709,12 +710,12 @@ itob
 app_local_get
 callsub offeredauth_5
 ==
-&&
+assert
 load 61
 gtxns RekeyTo
 global ZeroAddress
 ==
-&&
+assert
 load 61
 gtxns Sender
 load 58
@@ -725,7 +726,7 @@ itob
 app_local_get
 callsub offeredauth_5
 ==
-&&
+assert
 load 57
 load 58
 txnas Accounts
@@ -735,27 +736,26 @@ itob
 app_local_get
 callsub offeredamount_4
 <=
-&&
+assert
 load 61
 gtxns TypeEnum
 int pay
 ==
-&&
+assert
 load 61
 gtxns CloseRemainderTo
 global ZeroAddress
 ==
-&&
+assert
 load 61
 gtxns Receiver
 global CurrentApplicationAddress
 ==
-&&
+assert
 load 60
 txnas Accounts
 load 63
 ==
-&&
 assert
 load 61
 gtxns Amount

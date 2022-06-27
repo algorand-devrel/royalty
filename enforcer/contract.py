@@ -247,7 +247,9 @@ def transfer(
     payment_txn: abi.PaymentTransaction,
     offered_amt: abi.Uint64,
 ):
-    """Transfers an Asset from one account to another and enforces royalty payments"""
+    """Transfers an Asset from one account to another and enforces royalty payments. 
+        This instance of the `transfer` method requires a PaymentTransaction for payment in algos
+    """
 
     # Get the auth_addr from local state of the owner
     # If its not present, a 0 is returned and the call fails when we try
@@ -321,7 +323,9 @@ def transfer(
     payment_asset: abi.Asset,
     offered_amt: abi.Uint64,
 ):
-    """Transfers an Asset from one account to another and enforces royalty payments"""
+    """Transfers an Asset from one account to another and enforces royalty payments.
+        This instance of the `transfer` method requires an AssetTransfer transaction and an Asset to be passed 
+        corresponding to the Asset id of the transfer transaction."""
 
     # Get the auth_addr from local state of the owner
     # If its not present, a 0 is returned and the call fails when we try
