@@ -10,17 +10,16 @@ account_key = Bytes("account")
 
 from_creator = Txn.sender() == Global.creator_address()
 router = Router(
-    "arc-18-marketplace",
-    BareCallActions(
+    name="arc-18-marketplace",
+    bare_calls=BareCallActions(
         no_op=OnCompleteAction.create_only(Approve()),
         delete_application=OnCompleteAction.always(Return(from_creator)),
         update_application=OnCompleteAction.always(Return(from_creator)),
         opt_in=OnCompleteAction.always(Approve()),
         close_out=OnCompleteAction.always(Approve()),
-        clear_state=OnCompleteAction.call_only(Approve()),
     ),
+    clear_state=Approve(),
 )
-
 
 @router.method
 def list(
@@ -106,7 +105,6 @@ def buy(
                 },
                 curr_offer,
             ],
-            fields={},
         ),
         InnerTxnBuilder.Submit(),
         # Wipe listing
