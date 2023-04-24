@@ -17,6 +17,7 @@ Clone this repository, initialize a virtual environment and install requirements
 git clone git@github.com:algorand-devrel/royalty.git
 cd royalty
 python3.10 -m venv .venv
+pip install -r requirements.txt
 source .venv/bin/activate
 ```
 
