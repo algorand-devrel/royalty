@@ -105,6 +105,7 @@ def buy(
                 },
                 curr_offer,
             ],
+            extra_fields={},
         ),
         InnerTxnBuilder.Submit(),
         # Wipe listing

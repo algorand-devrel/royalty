@@ -1,6 +1,6 @@
 import base64
-from algosdk import algod
-from algosdk.future.transaction import *
+from algosdk.v2client import algod
+from algosdk.transaction import *
 
 
 def create_asa(
