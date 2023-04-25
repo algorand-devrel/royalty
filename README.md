@@ -18,7 +18,7 @@ git clone git@github.com:algorand-devrel/royalty.git
 cd royalty
 python3.10 -m venv .venv
 source .venv/bin/activate
-pip install git+https://github.com/algorand/pyteal@feature/abi
+pip install -r requirements.txt
 ```
 
 Run the example

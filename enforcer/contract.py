@@ -156,15 +156,15 @@ def update_offered(acct, asset, auth, amt, prev_auth, prev_amt):
 from_administrator = Txn.sender() == get_admin()
 
 router = Router(
-    "demo-arc-18",
-    BareCallActions(
+    name="demo-arc-18",
+    bare_calls=BareCallActions(
         no_op=OnCompleteAction.create_only(Seq(put_admin(Txn.sender()), Approve())),
         delete_application=OnCompleteAction.always(Return(from_administrator)),
         update_application=OnCompleteAction.always(Return(from_administrator)),
         opt_in=OnCompleteAction.always(Approve()),
         close_out=OnCompleteAction.always(Approve()),
-        clear_state=OnCompleteAction.call_only(Approve()),
     ),
+    clear_state=Approve(),
 )
 
 
